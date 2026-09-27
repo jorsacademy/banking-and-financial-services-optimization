@@ -1,77 +1,136 @@
 # Mathematical Model
 
-## Sets
+The project contains two optimization architectures.
+
+The staged model separates replenishment planning from route construction.
+The joint model is a small exact Inventory Routing Problem (IRP) in which
+route selection and delivered cash are optimized simultaneously.
+
+# 1. Core sets
 
 Let:
 
 - (I): cashpoints;
 - (T): planning days;
-- (G): geographic/operational clusters.
+- (G): operational/geographic clusters;
+- (R): candidate CIT routes.
 
-## Parameters
+For route (r):
+
+- (I_r subseteq I): cashpoints visited by route (r);
+- (D_r): route distance;
+- (V_r): sum of cashpoint visit costs on the route.
+
+Only routes with at most the configured stop limit are included.
+
+# 2. Parameters
 
 For cashpoint (i) and day (t):
 
 - (d_{it}): forecast net cash withdrawal;
-- (I_i^0): initial cash;
+- (B_i^0): initial cash;
 - (C_i): cash capacity;
 - (S_i): safety-stock target;
-- (Q_i): maximum replenishment per visit;
-- (c_i^V): cashpoint visit cost.
+- (Q_i): maximum delivery on one visit.
 
 System parameters:
 
-- (D_t): central-vault dispatch capacity;
-- (K): cash capacity per CIT vehicle;
-- (M): maximum stops per vehicle;
-- (ar V): maximum available vehicles per day;
-- (L_g): maximum daily visits in cluster (g);
+- (U_t): vault dispatch limit;
+- (K): CIT vehicle cash capacity;
+- (ar V): maximum routes/vehicles per day;
+- (L_g): daily visit limit for cluster (g);
 - (c^H): cash handling cost per unit;
 - (c^I): idle-cash holding cost per unit-day;
-- (c^F): fixed cost per deployed vehicle;
-- (c^S): service-shortfall penalty.
+- (c^F): fixed cost per operated route/vehicle;
+- (c^D): distance cost per route-distance unit;
+- (c^S): safety-stock shortfall penalty.
 
-## Decision variables
+# 3. Route generation
 
-For each cashpoint and day:
+For every cashpoint subset with size at most the stop limit, the minimum-distance
+depot tour is solved exactly by enumerating stop permutations.
 
-- (q_{it} ge 0): replenishment quantity;
-- (y_{it} in {0,1}): whether the cashpoint is visited;
-- (B_{it} ge 0): end-of-day cash balance;
-- (s_{it} ge 0): safety-stock shortfall.
+This creates a route catalog.
 
-For each day:
-
-- (v_t in mathbb{Z}_+): deployed CIT vehicles.
-
-## Objective
+For six cashpoints and at most three stops:
 
 [
-min
+|R|
+=
+{6 choose 1}
++
+{6 choose 2}
++
+{6 choose 3}
+=
+41
+]
+
+candidate routes.
+
+The integrated optimization selects from these route columns.
+
+# 4. Joint IRP decision variables
+
+For every day (t) and route (r):
+
+[
+z_{tr}in{0,1}
+]
+
+equals one if route (r) is operated.
+
+For each (iin I_r):
+
+[
+q_{tri}ge0
+]
+
+is cash delivered to cashpoint (i) by route (r) on day (t).
+
+For each cashpoint/day:
+
+- (B_{it}ge0): end-of-day cash balance;
+- (s_{it}ge0): safety-stock shortfall.
+
+# 5. Joint objective
+
+The integrated model minimizes:
+
+[
+sum_{t,r}
+left(
+c^F + V_r + c^D D_r
+ight)z_{tr}
+]
+
+[
++
+sum_{t,r}sum_{iin I_r}
+c^H q_{tri}
++
 sum_{i,t}
 left(
-c^H q_{it}
-+
-c_i^V y_{it}
-+
 c^I B_{it}
 +
 c^S s_{it}
 ight)
-+
-sum_t c^F v_t
 ]
 
-The objective captures the trade-off between frequent replenishment, idle cash, fleet use, and service risk.
+Route distance therefore affects the replenishment policy directly.
 
-## Inventory conservation
+# 6. Inventory conservation
 
-For the first day:
+For day 1:
 
 [
 B_{i1}
 =
-I_i^0 + q_{i1} - d_{i1}
+B_i^0
++
+sum_{r:iin I_r}q_{1ri}
+-
+d_{i1}
 ]
 
 For later days:
@@ -79,92 +138,141 @@ For later days:
 [
 B_{it}
 =
-B_{i,t-1} + q_{it} - d_{it}
+B_{i,t-1}
++
+sum_{r:iin I_r}q_{tri}
+-
+d_{it}
 ]
 
-## Visit linking
+# 7. Cashpoint route assignment
+
+Each cashpoint may appear in at most one selected route per day:
 
 [
-q_{it} le Q_i y_{it}
+sum_{r:iin I_r}z_{tr}
+le1
 ]
 
-A replenishment is possible only when a visit is opened.
+# 8. Delivery-route linking
 
-## Safety-stock target
+For every candidate route containing cashpoint (i):
 
 [
-B_{it} + s_{it} ge S_i
+q_{tri}
+le
+Q_i z_{tr}
 ]
 
-Safety stock is soft rather than hard. Shortfalls remain feasible but receive a large penalty.
+A route-specific delivery can be positive only when the route is operated.
 
-## Cashpoint capacity
+# 9. Route vehicle capacity
 
-Before daily withdrawals:
+For every route/day:
 
 [
-B_{i,t-1} + q_{it} le C_i
+sum_{iin I_r}q_{tri}
+le
+Kz_{tr}
 ]
 
-with initial cash replacing (B_{i,t-1}) on day 1.
+This is stronger than an aggregate daily fleet-capacity approximation because
+cash capacity is enforced route by route.
 
-End-of-day balance is also bounded by capacity.
-
-## Central-vault dispatch capacity
+# 10. Safety-stock target
 
 [
-sum_i q_{it} le D_t
+B_{it}+s_{it}ge S_i
 ]
 
-## Fleet carrying capacity
+The target is soft: violations remain feasible but are penalized.
+
+# 11. Cashpoint capacity
+
+Before forecast withdrawals:
 
 [
-sum_i q_{it} le K v_t
+B_{i,t-1}
++
+sum_{r:iin I_r}q_{tri}
+le
+C_i
 ]
 
-## Vehicle stop capacity
+with initial cash replacing (B_{i,t-1}) on the first day.
+
+# 12. Vault dispatch capacity
 
 [
-sum_i y_{it} le M v_t
+sum_rsum_{iin I_r}q_{tri}
+le
+U_t
 ]
 
-## Fleet availability
+# 13. Daily route/fleet availability
 
 [
-0 le v_t le ar V
+sum_r z_{tr}
+le
+ar V
 ]
 
-with integer (v_t).
+Every selected route represents one deployed CIT vehicle trip.
 
-## Cluster visit limits
+# 14. Cluster visit limits
 
-For every cluster (g):
+For cluster (g):
 
 [
-sum_{i in g} y_{it} le L_g
+sum_r
+|I_rcap g|
+z_{tr}
+le
+L_g
 ]
 
-These constraints approximate local operational or routing capacity before detailed routes are constructed.
+Because a cashpoint may belong to at most one selected route on a day, the
+coefficient counts actual visits.
 
-# Routing layer
+# 15. Staged baseline
 
-Once daily visits are selected, routing is solved over the active cashpoints.
+The staged baseline first solves a replenishment/fleet MILP without route
+distance in the objective.
 
-For each candidate route (r):
+A second exact routing procedure then partitions the selected daily visits into
+capacity-feasible routes and minimizes distance.
 
-- total delivery load must not exceed (K);
-- number of stops must not exceed (M);
-- route starts and ends at the depot.
+For comparison, the staged integrated cost is calculated as:
 
-For small instances, all feasible stop subsets are enumerated. The best stop order for each subset is found exactly, then dynamic programming selects the minimum-distance partition of all active cashpoints into at most (v_t) routes.
+[
+C_{staged}^{full}
+=
+C_{staged}^{planning}
++
+c^D D_{staged}
+]
 
-This routing layer is a post-optimization operational decomposition, not a fully integrated inventory-routing formulation.
+where (D_{staged}) is the exact post-optimization route distance.
 
-# Simulation layer
+# 16. Joint-vs-staged comparison
 
-Let deterministic forecast demand be (d_{it}).
+The reported improvement is:
 
-Realized demand in simulation is:
+[
+Delta C
+=
+C_{staged}^{full}
+-
+C_{joint}
+]
+
+A nonnegative value indicates that accounting for route economics inside the
+replenishment optimization improved or matched the staged policy under the same
+synthetic assumptions.
+
+# 17. Monte Carlo validation
+
+The deterministic forecast is perturbed multiplicatively:
 
 [
 	ilde d_{it}
@@ -172,20 +280,32 @@ Realized demand in simulation is:
 d_{it}epsilon_{it}
 ]
 
-where:
+with:
 
 [
 epsilon_{it}
 sim
-	ext{Lognormal}
+operatorname{Lognormal}
 left(
 -rac{sigma^2}{2},
 sigma
 ight)
 ]
 
-so that the multiplicative factor is centered near one.
+The optimized deliveries are held fixed during a simulation replication.
 
-The optimized replenishment quantities are held fixed during each replication. Realized cash-out volume and idle cash are then measured across replications.
+Reported robustness metrics include:
 
-This provides an out-of-sample robustness diagnostic for the deterministic plan.
+- mean cash-out volume;
+- 95th-percentile cash-out volume;
+- mean idle cash;
+- mean service-event rate.
+
+# 18. Modeling scope
+
+The route-column model is exact for the small synthetic instance but does not
+scale by brute-force route enumeration to large networks.
+
+A larger implementation would typically require column generation,
+branch-and-price, decomposition, rolling-horizon methods, or route-generation
+heuristics.
