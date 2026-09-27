@@ -27,3 +27,23 @@ __all__ += [
     "generate_route_catalog",
     "solve_joint_irp",
 ]
+
+from .stochastic_rolling_horizon import (
+    RollingHorizonResult,
+    StochasticHorizonResult,
+    compare_rolling_policies,
+    generate_demand_scenarios,
+    generate_realized_demand,
+    run_rolling_horizon,
+    solve_stochastic_horizon,
+)
+
+__all__ += [
+    "RollingHorizonResult",
+    "StochasticHorizonResult",
+    "compare_rolling_policies",
+    "generate_demand_scenarios",
+    "generate_realized_demand",
+    "run_rolling_horizon",
+    "solve_stochastic_horizon",
+]
