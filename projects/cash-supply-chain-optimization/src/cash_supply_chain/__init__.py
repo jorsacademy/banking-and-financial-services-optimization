@@ -63,3 +63,29 @@ __all__ += [
     "generate_binary_scenario_tree",
     "solve_multistage_cvar_irp",
 ]
+
+from .scenario_reduction import (
+    ScenarioReductionResult,
+    leaf_path_vectors,
+    reduce_scenario_tree,
+    standardized_pairwise_distance,
+)
+
+__all__ += [
+    "ScenarioReductionResult",
+    "leaf_path_vectors",
+    "reduce_scenario_tree",
+    "standardized_pairwise_distance",
+]
+
+from .progressive_hedging import (
+    ProgressiveHedgingResult,
+    benchmark_progressive_hedging,
+    run_progressive_hedging,
+)
+
+__all__ += [
+    "ProgressiveHedgingResult",
+    "benchmark_progressive_hedging",
+    "run_progressive_hedging",
+]
