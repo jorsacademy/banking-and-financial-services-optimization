@@ -54,12 +54,12 @@ class CashSupplyChainResult:
 def default_problem() -> CashSupplyChainProblem:
     cashpoints = pd.DataFrame(
         [
-            ("ATM_A", "atm", "north", 95.0, 210.0, 20.0, 130.0, 1.8),
-            ("ATM_B", "atm", "north", 85.0, 190.0, 18.0, 120.0, 1.6),
-            ("BRANCH_C", "branch", "central", 150.0, 320.0, 35.0, 180.0, 2.8),
-            ("ATM_D", "atm", "central", 100.0, 220.0, 22.0, 135.0, 1.9),
-            ("BRANCH_E", "branch", "south", 170.0, 340.0, 40.0, 190.0, 3.0),
-            ("ATM_F", "atm", "south", 90.0, 200.0, 20.0, 125.0, 1.7),
+            ("ATM_A", "atm", "north", 95.0, 210.0, 20.0, 130.0, 1.8, 2.0, 8.0),
+            ("ATM_B", "atm", "north", 85.0, 190.0, 18.0, 120.0, 1.6, 5.0, 9.0),
+            ("BRANCH_C", "branch", "central", 150.0, 320.0, 35.0, 180.0, 2.8, 6.0, 4.0),
+            ("ATM_D", "atm", "central", 100.0, 220.0, 22.0, 135.0, 1.9, 9.0, 5.0),
+            ("BRANCH_E", "branch", "south", 170.0, 340.0, 40.0, 190.0, 3.0, 7.0, 1.0),
+            ("ATM_F", "atm", "south", 90.0, 200.0, 20.0, 125.0, 1.7, 3.0, 2.0),
         ],
         columns=[
             "cashpoint",
@@ -70,6 +70,8 @@ def default_problem() -> CashSupplyChainProblem:
             "safety_stock",
             "maximum_delivery",
             "visit_cost",
+            "x_coord",
+            "y_coord",
         ],
     ).set_index("cashpoint")
 
