@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from cash_supply_chain.model import default_problem, solve
+from cash_supply_chain.routing import route_plan
 from cash_supply_chain.simulation import (
     fleet_sensitivity,
     simulate_plan,
@@ -16,6 +17,7 @@ if __name__ == "__main__":
     simulation = simulate_plan(result, problem)
     summary = summarize_simulation(simulation)
     sensitivity = fleet_sensitivity(problem)
+    routes = route_plan(result, problem)
 
     output_dir = Path(__file__).resolve().parent / "outputs"
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -29,6 +31,7 @@ if __name__ == "__main__":
     simulation.to_csv(output_dir / "monte_carlo_simulation.csv", index=False)
     summary.to_csv(output_dir / "simulation_summary.csv")
     sensitivity.to_csv(output_dir / "fleet_sensitivity.csv", index=False)
+    routes.to_csv(output_dir / "cit_routes.csv", index=False)
 
     print("total_cost:", round(result.total_cost, 4))
     print(summary.round(4).to_string())
