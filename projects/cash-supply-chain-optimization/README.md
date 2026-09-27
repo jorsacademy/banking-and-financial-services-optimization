@@ -2,13 +2,14 @@
 
 An integrated Operations Research project for daily cash operations across a synthetic ATM and branch network.
 
-The project now contains three architectures:
+The project now contains four architectures:
 
 1. a **staged baseline** that solves replenishment/fleet decisions first and routing second;
 2. a **deterministic joint Inventory Routing Problem (IRP)** that chooses replenishment quantities and CIT routes in the same MILP;
-3. a **stochastic rolling-horizon IRP** that repeatedly re-optimizes short-horizon route and replenishment decisions under demand scenarios.
+3. a **stochastic rolling-horizon IRP** that repeatedly re-optimizes short-horizon route and replenishment decisions under demand scenarios;
+4. a **full multistage scenario-tree IRP with CVaR risk aversion**, where decisions are indexed by information-state nodes and expensive tail paths enter the objective explicitly.
 
-The stochastic rolling-horizon layer is the most advanced model in the project.
+The multistage CVaR model is the most advanced formulation in the project.
 
 ## Decision layers
 
@@ -119,6 +120,106 @@ cost_improvement_vs_staged
 ```
 
 Because the staged plan is route-feasible for the synthetic instance, it provides a valid benchmark for the joint formulation.
+
+## Multistage scenario-tree IRP with CVaR
+
+Module:
+
+```text
+cash_supply_chain.multistage_cvar_irp
+```
+
+This layer removes the two-stage approximation used inside the rolling-horizon model.
+
+The scenario tree is explicit:
+
+```text
+                    root
+                  /      \
+                 L        H
+               /  \      /  \
+             LL   LH    HL   HH
+            / \   / \   / \   / \
+          ... terminal demand paths ...
+```
+
+A decision is attached to a **tree node**, not to a complete scenario path.
+
+That gives structural multistage non-anticipativity:
+
+- every terminal path shares the same root decision;
+- paths with the same first demand history share the same stage-1 decision;
+- paths only receive different route/replenishment decisions after their observed histories diverge.
+
+No pairwise non-anticipativity equalities between scenario copies are required because common-history paths literally reference the same decision variables.
+
+### Risk-neutral objective
+
+With risk aversion set to zero, the model minimizes expected route, handling, inventory, safety-shortfall, and cash-out cost over the complete scenario tree.
+
+### CVaR risk-averse objective
+
+The risk-averse version minimizes:
+
+```text
+expected cost
++
+risk_aversion × CVaR_alpha(total path cost)
+```
+
+The CVaR layer introduces:
+
+- a VaR threshold variable;
+- one excess-loss variable per terminal scenario;
+- terminal path-cost constraints.
+
+The purpose is to distinguish two policies that can have similar expected cost but very different exposure to expensive cash-out / emergency-service paths.
+
+The runner compares:
+
+```text
+risk-neutral multistage IRP
+vs.
+CVaR-averse multistage IRP
+```
+
+on the exact same scenario tree and reports:
+
+- expected cost;
+- CVaR cost;
+- worst terminal-path cost;
+- expected cash-out;
+- initial/root delivery;
+- probability-weighted route usage;
+- expected-cost change versus risk-neutral;
+- CVaR improvement versus risk-neutral;
+- worst-path improvement versus risk-neutral.
+
+### Run
+
+```bash
+python projects/cash-supply-chain-optimization/run_multistage_cvar.py
+```
+
+Generated artifacts include:
+
+```text
+multistage_tree_nodes.csv
+multistage_tree_demand.csv
+multistage_risk_comparison.csv
+
+risk_neutral_multistage_deliveries.csv
+risk_neutral_multistage_routes.csv
+risk_neutral_multistage_inventory.csv
+risk_neutral_multistage_cashout.csv
+risk_neutral_leaf_costs.csv
+
+risk_averse_multistage_deliveries.csv
+risk_averse_multistage_routes.csv
+risk_averse_multistage_inventory.csv
+risk_averse_multistage_cashout.csv
+risk_averse_leaf_costs.csv
+```
 
 ## Stochastic rolling-horizon IRP
 
@@ -235,6 +336,7 @@ cash-supply-chain-optimization/
         ├── routing.py
         ├── joint_irp.py
         ├── stochastic_rolling_horizon.py
+        ├── multistage_cvar_irp.py
         └── simulation.py
 ```
 
@@ -248,6 +350,9 @@ python projects/cash-supply-chain-optimization/run.py
 
 # stochastic receding-horizon experiment
 python projects/cash-supply-chain-optimization/run_rolling_horizon.py
+
+# full multistage + CVaR experiment
+python projects/cash-supply-chain-optimization/run_multistage_cvar.py
 ```
 
 The runner solves both architectures and writes:
@@ -286,7 +391,8 @@ pytest \
   tests/test_cash_supply_chain.py \
   tests/test_cash_supply_chain_routing.py \
   tests/test_cash_supply_chain_joint_irp.py \
-  tests/test_cash_supply_chain_stochastic_rolling.py
+  tests/test_cash_supply_chain_stochastic_rolling.py \
+  tests/test_cash_supply_chain_multistage_cvar.py
 ```
 
 The tests validate:
@@ -305,6 +411,11 @@ The tests validate:
 - scenario terminal-state feasibility;
 - rolling inventory-state transitions;
 - deterministic/stochastic comparison on the same realized path;
+- scenario-tree probability conservation;
+- structural multistage non-anticipativity;
+- tree-edge inventory conservation;
+- risk-neutral expected-cost optimality;
+- CVaR tail-cost trade-off;
 - Monte Carlo reproducibility.
 
 ## Scaling path
