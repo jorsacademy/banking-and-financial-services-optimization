@@ -22,7 +22,12 @@ if __name__ == "__main__":
     staged_routes = route_plan(staged, problem)
 
     joint = solve_joint_irp(problem)
-    comparison = compare_staged_and_joint(problem)
+    comparison = compare_staged_and_joint(
+        problem,
+        staged=staged,
+        joint=joint,
+        staged_routes=staged_routes,
+    )
 
     staged_simulation = simulate_plan(staged, problem)
     joint_simulation = simulate_plan(joint, problem)
