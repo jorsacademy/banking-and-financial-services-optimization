@@ -168,6 +168,33 @@ def _path_nodes(tree: ScenarioTree, leaf: str) -> list[str]:
     return list(reversed(path))
 
 
+def _weighted_var_cvar(
+    costs: pd.Series,
+    probabilities: pd.Series,
+    alpha: float,
+) -> tuple[float, float]:
+    """Compute discrete weighted VaR/CVaR via the Rockafellar-Uryasev form."""
+    probabilities = probabilities.loc[costs.index].astype(float)
+    probabilities = probabilities / probabilities.sum()
+
+    candidates = sorted(set(float(v) for v in costs.to_numpy()))
+    best_eta = candidates[0]
+    best_value = float("inf")
+
+    for eta in candidates:
+        value = eta + float(
+            (
+                probabilities
+                * (costs - eta).clip(lower=0.0)
+            ).sum()
+        ) / (1.0 - alpha)
+        if value < best_value - 1e-12:
+            best_eta = eta
+            best_value = value
+
+    return float(best_eta), float(best_value)
+
+
 def solve_multistage_cvar_irp(
     problem: CashSupplyChainProblem | None = None,
     tree: ScenarioTree | None = None,
@@ -603,15 +630,11 @@ def solve_multistage_cvar_irp(
         )
     )
 
-    eta = float(x[eta_idx])
-    cvar_cost = float(
-        eta
-        + sum(
-            float(nodes.loc[leaf, "probability"])
-            * x[xi0 + leaf_i[leaf]]
-            / (1.0 - cvar_alpha)
-            for leaf in leaves
-        )
+    leaf_probabilities = nodes.loc[leaves, "probability"].astype(float)
+    eta, cvar_cost = _weighted_var_cvar(
+        leaf_costs,
+        leaf_probabilities,
+        cvar_alpha,
     )
 
     expected_cashout = float(
