@@ -24,6 +24,7 @@ class CashSupplyChainProblem:
     stops_per_vehicle: int = 3
     maximum_vehicles_per_day: int = 3
     vehicle_fixed_cost: float = 5.0
+    distance_cost_per_unit: float = 0.35
     handling_cost_per_unit: float = 0.010
     holding_cost_per_unit_day: float = 0.007
     shortage_penalty_per_unit: float = 4.0
