@@ -60,7 +60,7 @@ def default_problem() -> LiquidityFundingProblem:
 
     horizons = ["1m", "3m", "6m", "12m"]
     stress_outflows = pd.Series(
-        [55.0, 85.0, 115.0, 150.0],
+        [45.0, 70.0, 95.0, 120.0],
         index=horizons,
         name="fixed_stress_outflow",
     )
@@ -70,7 +70,7 @@ def default_problem() -> LiquidityFundingProblem:
             [0.02, 0.02, 0.05, 0.08, 0.12],
             [0.04, 0.04, 0.12, 0.18, 0.30],
             [0.06, 0.08, 0.22, 0.30, 0.48],
-            [0.10, 0.15, 0.40, 0.55, 0.75],
+            [0.08, 0.12, 0.30, 0.42, 0.60],
         ],
         index=horizons,
         columns=funding_sources.index,
