@@ -668,18 +668,23 @@ def compare_risk_attitudes(
     tree: ScenarioTree | None = None,
     cvar_alpha: float = 0.90,
     risk_aversion: float = 0.75,
+    neutral: MultistageCVaRResult | None = None,
+    risk_averse: MultistageCVaRResult | None = None,
 ) -> tuple[pd.DataFrame, dict[str, MultistageCVaRResult]]:
-    """Compare risk-neutral and CVaR-averse policies on one scenario tree."""
+    """Compare risk-neutral and CVaR-averse policies on one scenario tree.
+
+    Precomputed solutions may be supplied to avoid repeated MILP solves.
+    """
     p = problem or default_problem()
     tree = tree or generate_binary_scenario_tree(p)
 
-    neutral = solve_multistage_cvar_irp(
+    neutral = neutral or solve_multistage_cvar_irp(
         p,
         tree=tree,
         cvar_alpha=cvar_alpha,
         risk_aversion=0.0,
     )
-    risk_averse = solve_multistage_cvar_irp(
+    risk_averse = risk_averse or solve_multistage_cvar_irp(
         p,
         tree=tree,
         cvar_alpha=cvar_alpha,
