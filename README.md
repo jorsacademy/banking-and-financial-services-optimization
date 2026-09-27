@@ -8,7 +8,7 @@ The repository focuses on **prescriptive analytics**: models that choose actions
 
 | Project | Core decision | Methods | Status |
 |---|---|---|---|
-| [Asset-Liability Management](projects/asset-liability-management/) | Adaptive balance-sheet, funding, and hedge policy on an interest-rate scenario tree | LP, multi-period stochastic programming, sensitivity analysis | Flagship |
+| [Asset-Liability Management](projects/asset-liability-management/) | Adaptive balance-sheet, funding, and hedge policy on an interest-rate scenario tree | LP, multi-period stochastic programming, sensitivity analysis | Flagship |\n| [IRRBB Curve-Hedge Optimization](projects/irrbb-curve-hedging/) | Choose a swap hedge portfolio against key-rate PV01 and non-parallel curve shocks | LP, key-rate duration/PV01, minimax EVE stress hedging | Flagship |
 | [Credit & Capital Allocation](projects/credit-capital-allocation/) | Which exposures to approve/fund under capital and concentration limits | MILP | Implemented |
 | [Loan Pricing & Limit Optimization](projects/loan-pricing-and-limit-optimization/) | Customer-level rate and credit-limit decisions | MILP, predict-then-optimize | Implemented |
 | [Liquidity & Funding Optimization](projects/liquidity-and-funding-optimization/) | Funding mix and liquidity buffer decisions | LP, stress scenarios | Implemented |
