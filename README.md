@@ -9,15 +9,15 @@ The repository focuses on **prescriptive analytics**: models that choose actions
 | Project | Core decision | Methods | Status |
 |---|---|---|---|
 | [Asset-Liability Management](projects/asset-liability-management/) | Balance-sheet allocation across assets, deposits, wholesale funding, and hedges | LP, multi-period optimization, scenario analysis | Implemented |
-| Credit & Capital Allocation | Which exposures to approve/fund under capital and concentration limits | MILP, robust optimization | Planned |
-| Loan Pricing & Limit Optimization | Customer-level rate and credit-limit decisions | Nonlinear/MILP, predict-then-optimize | Planned |
-| Liquidity & Funding Optimization | Funding mix and liquidity buffer decisions | Stochastic LP, robust optimization | Planned |
-| Collections Optimization | Which delinquent account receives which treatment and when | Assignment, MDP/bandits | Planned |
-| Collateral Allocation | Allocate eligible collateral under haircuts and concentration rules | LP, min-cost flow | Planned |
-| Fraud Alert Triage | Select alerts for investigation under scarce analyst capacity | Knapsack, assignment | Planned |
-| Intraday Liquidity | Payment release/sequencing under liquidity limits | Scheduling, network optimization | Planned |
-| ATM Cash Replenishment | Replenishment timing and quantities | Inventory-routing, stochastic optimization | Planned |
-| Payment Routing | Route transactions across processors/rails | Multi-objective routing, online optimization | Planned |
+| [Credit & Capital Allocation](projects/credit-capital-allocation/) | Which exposures to approve/fund under capital and concentration limits | MILP | Implemented |
+| [Loan Pricing & Limit Optimization](projects/loan-pricing-and-limit-optimization/) | Customer-level rate and credit-limit decisions | MILP, predict-then-optimize | Implemented |
+| [Liquidity & Funding Optimization](projects/liquidity-and-funding-optimization/) | Funding mix and liquidity buffer decisions | LP, stress scenarios | Implemented |
+| [Collections Optimization](projects/collections-optimization/) | Which delinquent account receives which treatment | MILP, resource allocation | Implemented |
+| [Collateral Allocation](projects/collateral-allocation/) | Allocate eligible collateral under haircuts and eligibility rules | LP, network allocation | Implemented |
+| [Fraud Alert Triage](projects/fraud-alert-triage/) | Select alerts for investigation under scarce analyst capacity | Binary optimization | Implemented |
+| [Intraday Liquidity](projects/intraday-liquidity/) | Payment release/sequencing under liquidity limits | MILP, scheduling | Implemented |
+| [ATM Cash Replenishment](projects/atm-cash-replenishment/) | Replenishment timing and quantities | Multi-period MILP | Implemented |
+| [Payment Routing](projects/payment-routing/) | Route payment segments across processors | Assignment MILP | Implemented |
 
 ## Design principles
 
@@ -61,7 +61,16 @@ python -m banking_optimization.alm
 .
 ├── docs/
 ├── projects/
-│   └── asset-liability-management/
+│   ├── asset-liability-management/
+│   ├── credit-capital-allocation/
+│   ├── loan-pricing-and-limit-optimization/
+│   ├── liquidity-and-funding-optimization/
+│   ├── collections-optimization/
+│   ├── collateral-allocation/
+│   ├── fraud-alert-triage/
+│   ├── intraday-liquidity/
+│   ├── atm-cash-replenishment/
+│   └── payment-routing/
 ├── src/
 │   └── banking_optimization/
 ├── tests/
