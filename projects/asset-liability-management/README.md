@@ -1,72 +1,199 @@
 # Asset-Liability Management Optimization
 
-A synthetic bank balance-sheet allocation model that chooses asset mix, funding mix, and a simple interest-rate hedge under multiple rate/funding scenarios.
+A synthetic **prescriptive ALM** project with two optimization layers:
 
-The purpose is to demonstrate **prescriptive ALM**: the model does not merely calculate balance-sheet risk; it chooses a feasible balance-sheet configuration.
+1. a compact one-period LP for transparent balance-sheet allocation;
+2. a three-period stochastic ALM model on a scenario tree with adaptive rebalancing.
 
-## Decision variables
+The project is designed as the flagship banking example in this repository. It treats the balance sheet, funding mix, liquidity posture, duration gap, and hedge position as coupled decisions rather than as separate reporting metrics.
 
-- amount allocated to each asset bucket;
-- amount raised from each funding source;
-- positive/negative hedge notional;
-- scenario-specific NII shortfall variables.
+## Implementations
 
-## Objective
+### 1. One-period ALM
 
-Minimize the negative of probability-weighted net interest income, plus penalties for:
+Module:
 
-- NII falling below a target in individual scenarios;
-- gross hedge notional.
+```text
+banking_optimization.alm
+```
 
-Equivalently, the model maximizes expected NII while discouraging scenario downside and unnecessary hedging.
+The model chooses:
 
-## Constraints
+- asset-bucket allocations;
+- funding-source allocations;
+- an interest-rate hedge;
+- scenario NII shortfall variables.
 
-The implementation includes:
+It enforces:
 
-- asset-side balance-sheet identity;
-- liability/funding-side balance-sheet identity;
-- minimum/maximum bucket allocations;
-- a capital-ratio proxy using risk-weighted assets;
-- a liquidity-buffer proxy using liquid-asset weights and funding runoff rates;
+- balance-sheet identities;
+- bucket limits;
+- a capital-ratio proxy;
+- a liquidity proxy;
 - an absolute duration-gap limit;
-- scenario NII shortfall accounting;
-- a maximum hedge notional.
+- scenario-level NII downside accounting.
 
-## Synthetic scenarios
-
-The default instance uses four scenarios:
-
-- base;
-- rates up;
-- rates down;
-- funding stress.
-
-All inputs are synthetic and intentionally small enough to inspect.
-
-## Run
-
-From the repository root:
+Run:
 
 ```bash
-pip install -e ".[dev]"
 python -m banking_optimization.alm
 ```
 
-Run tests:
+### 2. Multi-period stochastic ALM
+
+Module:
+
+```text
+banking_optimization.alm_stochastic
+```
+
+The stochastic version uses a three-period scenario tree:
+
+```text
+                 root
+                /    \
+              up      down
+             /  \     /  \
+         up_up up_down down_up down_down
+```
+
+Every node has synthetic:
+
+- asset yields;
+- funding costs;
+- funding-runoff stress;
+- hedge payoff;
+- probability.
+
+The optimizer can adapt the asset mix, funding mix, and hedge after uncertainty is revealed. Decisions are node-based, so non-anticipativity is built into the scenario-tree representation: nodes sharing the same observed history share the same decision.
+
+The objective balances:
+
+- expected multi-period NII;
+- NII downside penalties;
+- asset-rebalancing costs;
+- funding-rebalancing costs;
+- hedge costs.
+
+Run:
 
 ```bash
-pytest tests/test_alm.py
+python -m banking_optimization.alm_stochastic
 ```
+
+## Static-policy benchmark
+
+The stochastic model can also be solved with:
+
+```python
+solve_stochastic(problem, adaptive=False)
+```
+
+In this mode, future asset allocations, funding allocations, and hedge positions are constrained to remain equal to the root decision.
+
+This provides a directly comparable benchmark for the adaptive stochastic policy.
+
+```python
+from banking_optimization.alm_stochastic import compare_policies
+
+comparison = compare_policies()
+print(comparison)
+```
+
+The reported `objective_improvement_vs_static` is the model-implied value of allowing the balance sheet to adapt to observed scenario states under the same synthetic assumptions.
+
+## Sensitivity analysis
+
+The experiment layer evaluates the stochastic ALM policy over a grid of:
+
+- maximum duration-gap limits;
+- NII shortfall penalties.
+
+Run:
+
+```bash
+python projects/asset-liability-management/run_experiments.py
+```
+
+It writes reproducible CSV outputs under:
+
+```text
+projects/asset-liability-management/outputs/
+├── policy_comparison.csv
+├── sensitivity_grid.csv
+├── adaptive_asset_policy.csv
+├── adaptive_funding_policy.csv
+└── adaptive_node_metrics.csv
+```
+
+The `outputs/` directory is intentionally git-ignored because these files are generated artifacts.
+
+## Validation
+
+The test suite checks:
+
+- balance-sheet equality at every scenario-tree node;
+- asset/funding bucket bounds;
+- capital-ratio feasibility;
+- liquidity feasibility;
+- duration-gap feasibility;
+- hedge bounds;
+- NII shortfall accounting;
+- static-policy invariance;
+- adaptive-policy dominance over the constrained static benchmark;
+- sensitivity-grid reproducibility.
+
+Run:
+
+```bash
+pytest tests/test_alm.py tests/test_alm_stochastic.py tests/test_alm_experiments.py
+```
+
+## Model architecture
+
+The project follows:
+
+```text
+scenario assumptions
+        ↓
+rates / runoff / hedge economics
+        ↓
+multi-period optimization
+        ↓
+adaptive balance-sheet policy
+        ↓
+feasibility validation
+        ↓
+baseline + sensitivity comparison
+```
+
+See [MATHEMATICAL_MODEL.md](MATHEMATICAL_MODEL.md) for the formulation.
 
 ## Why this is an optimization project
 
-ALM is often presented as a measurement exercise. Here the exposures themselves are decision variables. Capital, liquidity, duration, funding mix, and earnings are therefore coupled inside one optimization model.
+ALM is often shown as a measurement exercise: calculate duration gap, NII sensitivity, or liquidity ratios for a fixed balance sheet.
+
+Here those exposures are decision variables. Capital, liquidity, earnings, funding structure, interest-rate exposure, and adjustment costs therefore interact inside one optimization system.
+
+The stochastic version adds a second decision layer: not only **what balance sheet to hold**, but also **how the policy should react after uncertainty is partially observed**.
 
 ## Limitations
 
-This is not a regulatory ALM, IRRBB, LCR, NSFR, FTP, EVE, behavioral-deposit, prepayment, or hedge-accounting engine. The ratios are educational proxies. A real implementation requires institution-specific cash-flow models, behavioral assumptions, curve construction, transfer pricing, accounting treatment, governance, validation, and regulatory interpretation.
+This remains an educational synthetic model. It is not a regulatory ALM, IRRBB, EVE, LCR, NSFR, FTP, hedge-accounting, treasury, behavioral-deposit, or prepayment engine.
+
+A production implementation would require, among other things:
+
+- contractual cash-flow ladders;
+- yield-curve construction and repricing conventions;
+- behavioral non-maturity-deposit models;
+- prepayment and early-redemption models;
+- currency segmentation;
+- transfer-pricing assumptions;
+- instrument-level optionality;
+- hedge accounting and market-value treatment;
+- capital/liquidity regulation specific to the institution and jurisdiction;
+- model governance, validation, controls, and auditability.
 
 ## Disclaimer
 
-Educational use only. This project is not financial, investment, accounting, legal, credit, or regulatory advice.
+Educational use only. This project is not financial, investment, accounting, legal, credit, treasury, or regulatory advice.
