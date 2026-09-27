@@ -122,6 +122,127 @@ cost_improvement_vs_staged
 
 Because the staged plan is route-feasible for the synthetic instance, it provides a valid benchmark for the joint formulation.
 
+## Route column generation and branch-and-price
+
+Module:
+
+\`\`\`text
+cash_supply_chain.column_generation
+\`\`\`
+
+The deterministic and stochastic IRP formulations above still use an explicit
+route catalog on the small research instance. The column-generation layer
+removes that requirement from the routing master.
+
+Its scope is a **fixed-delivery CIT routing subproblem**:
+
+\`\`\`text
+upstream replenishment model
+        ↓
+daily fixed cash quantities by cashpoint
+        ↓
+restricted route master
+        ↕
+pricing subproblem
+        ↓
+integer route plan
+\`\`\`
+
+### Restricted master problem
+
+The master initially contains only a small set of route columns.
+
+Each route variable covers a subset of cashpoints exactly once, with:
+
+- vehicle cash-capacity feasibility;
+- maximum stops per route;
+- depot start/end;
+- exact small-instance route ordering;
+- fixed vehicle, visit, and distance cost.
+
+Artificial coverage variables with a large penalty keep the LP master feasible
+during early pricing iterations.
+
+### Pricing
+
+After solving the LP master, cashpoint-coverage duals and the fleet dual are
+passed to the pricing oracle.
+
+For candidate route \(r\), reduced cost is:
+
+\`\`\`text
+route_cost
+- sum(coverage duals for cashpoints on r)
+- fleet dual
+\`\`\`
+
+Only negative reduced-cost routes are added to the master.
+
+The master is re-solved until the exact pricing oracle finds no improving
+column.
+
+The current educational pricing oracle searches feasible stop subsets exactly.
+This avoids putting every route in the master, but it is still exponential
+inside the pricing oracle. In a larger deployment this is the component that
+would be replaced by an ESPPRC / resource-constrained shortest-path labeling
+algorithm.
+
+### Restricted-master integer solve
+
+Once LP column generation terminates, the generated columns are passed to a
+binary restricted-master MILP.
+
+On small validation instances its objective is compared with a benchmark that
+enumerates every feasible route.
+
+### Ryan-Foster branch-and-price
+
+The module also includes a small exact branch-and-price demonstrator for the
+fixed-delivery set-partitioning routing problem.
+
+When the route-master LP is fractional, branching is performed on a pair of
+cashpoints \(i,j\):
+
+- **together branch:** any newly priced route must contain both or neither;
+- **separate branch:** no newly priced route may contain both.
+
+The branching rule is passed directly into the pricing oracle, so newly
+generated routes remain consistent with the branch node.
+
+Every branch node therefore performs its own column-generation loop.
+
+If the node limit is reached or numerical degeneracy prevents a Ryan-Foster
+pair from being identified, the result is explicitly marked non-exact rather
+than presented as a complete branch-and-price proof.
+
+### Run
+
+\`\`\`bash
+python projects/cash-supply-chain-optimization/run_column_generation.py
+\`\`\`
+
+The benchmark compares:
+
+\`\`\`text
+full route enumeration
+vs.
+LP column generation + restricted-master MILP
+vs.
+Ryan-Foster branch-and-price
+\`\`\`
+
+Generated outputs include:
+
+\`\`\`text
+routing_fixed_delivery_requirements.csv
+routing_full_catalog_routes.csv
+routing_generated_columns.csv
+routing_cg_selected_routes.csv
+routing_cg_pricing_history.csv
+routing_bp_selected_routes.csv
+routing_bp_search_log.csv
+\`\`\`
+
 ## Stochastic scaling: scenario reduction + Progressive Hedging
 
 Modules:
@@ -440,6 +561,7 @@ cash-supply-chain-optimization/
         ├── multistage_cvar_irp.py
         ├── scenario_reduction.py
         ├── progressive_hedging.py
+        ├── column_generation.py
         └── simulation.py
 ```
 
@@ -459,6 +581,9 @@ python projects/cash-supply-chain-optimization/run_multistage_cvar.py
 
 # scenario reduction + decomposition experiment
 python projects/cash-supply-chain-optimization/run_scaling.py
+
+# route master column generation + branch-and-price benchmark
+python projects/cash-supply-chain-optimization/run_column_generation.py
 ```
 
 The runner solves both architectures and writes:
@@ -500,7 +625,8 @@ pytest \
   tests/test_cash_supply_chain_stochastic_rolling.py \
   tests/test_cash_supply_chain_multistage_cvar.py \
   tests/test_cash_supply_chain_scenario_reduction.py \
-  tests/test_cash_supply_chain_progressive_hedging.py
+  tests/test_cash_supply_chain_progressive_hedging.py \
+  tests/test_cash_supply_chain_column_generation.py
 ```
 
 The tests validate:
@@ -529,6 +655,9 @@ The tests validate:
 - Progressive Hedging consensus construction;
 - PH residual diagnostics;
 - PH-vs-extensive-form benchmark plumbing;
+- column-generation reduced-cost termination;
+- generated-column integer solution vs full route enumeration;
+- Ryan-Foster branch-and-price closure of a fractional root;
 - Monte Carlo reproducibility.
 
 ## Scaling path
@@ -538,8 +667,8 @@ The current route-column formulation is exact and appropriate for a deliberately
 Larger networks would require methods such as:
 
 - column generation;
-- branch-and-price;
-- route-generation heuristics;
+- resource-constrained shortest-path pricing instead of exhaustive pricing;
+- branch-and-price integrated deeper into the inventory-routing master;
 - decomposition by cash center/geography;
 - multistage scenario-tree non-anticipativity beyond the current two-stage look-ahead;
 - neighborhood search;
