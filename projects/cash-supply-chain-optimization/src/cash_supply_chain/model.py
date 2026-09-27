@@ -28,6 +28,7 @@ class CashSupplyChainProblem:
     handling_cost_per_unit: float = 0.010
     holding_cost_per_unit_day: float = 0.007
     shortage_penalty_per_unit: float = 4.0
+    cashout_penalty_per_unit: float = 20.0
 
 
 @dataclass(frozen=True)
