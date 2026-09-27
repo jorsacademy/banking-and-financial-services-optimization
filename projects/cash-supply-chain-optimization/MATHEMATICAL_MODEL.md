@@ -309,3 +309,248 @@ scale by brute-force route enumeration to large networks.
 A larger implementation would typically require column generation,
 branch-and-price, decomposition, rolling-horizon methods, or route-generation
 heuristics.
+
+
+# 19. Stochastic rolling-horizon IRP
+
+The rolling-horizon layer embeds a two-stage stochastic route-column model
+inside a receding-horizon controller.
+
+At a replanning date, let:
+
+- (H): short look-ahead horizon;
+- (Omega): demand scenarios;
+- (p_omega): scenario probability;
+- (t=1): current execution day;
+- (t=2,ldots,H): future recourse days.
+
+## 19.1 First-stage decisions
+
+Today's decisions are shared across all scenarios:
+
+- (z_r^0 in {0,1}): whether route (r) operates today;
+- (q_{ri}^0 ge 0): cash delivered today to cashpoint (i) on route (r).
+
+These variables are **non-anticipative** because they are not indexed by
+scenario.
+
+They must be chosen before realized demand is known.
+
+## 19.2 Scenario-specific recourse
+
+For future days and scenario (omega):
+
+- (z_{omega tr} in {0,1}): future route selection;
+- (q_{omega tri} ge 0): future route-specific delivery;
+- (B_{omega it} ge 0): end-of-day inventory;
+- (s_{omega it} ge 0): safety-stock shortfall;
+- (l_{omega it} ge 0): lost demand / cash-out.
+
+Future routing and replenishment decisions can react to the scenario.
+
+This produces a two-stage approximation rather than a full multistage
+scenario-tree model.
+
+## 19.3 Inventory balance with lost demand
+
+For the current day:
+
+[
+B_{omega i1}
+=
+B_i^{current}
++
+sum_{r:iin I_r}q_{ri}^0
++
+l_{omega i1}
+-
+	ilde d_{omega i1}
+]
+
+For later horizon days:
+
+[
+B_{omega it}
+=
+B_{omega i,t-1}
++
+sum_{r:iin I_r}q_{omega tri}
++
+l_{omega it}
+-
+	ilde d_{omega it}
+]
+
+Lost demand prevents extreme demand scenarios from making the model infeasible.
+
+It is bounded by realized scenario demand and receives a large penalty.
+
+## 19.4 Expected-cost objective
+
+The first-stage route and handling costs are paid once.
+
+Future costs and state costs are probability weighted:
+
+[
+min
+C^{first}(z^0,q^0)
++
+sum_{omegainOmega}
+p_omega
+left[
+C_omega^{recourse}
++
+C_omega^{inventory}
++
+C_omega^{safety}
++
+C_omega^{cashout}
+ight]
+]
+
+where cash-out cost is:
+
+[
+C_omega^{cashout}
+=
+c^L
+sum_{i,t}l_{omega it}
+]
+
+and (c^L) is the explicit lost-demand penalty.
+
+## 19.5 First-stage operational constraints
+
+Today's shared route variables satisfy the same physical restrictions as the
+deterministic joint IRP:
+
+- route-specific vehicle cash capacity;
+- cashpoint maximum delivery;
+- at most one route visit per cashpoint;
+- vault dispatch capacity;
+- maximum daily vehicles/routes;
+- cluster visit limits;
+- cashpoint storage capacity.
+
+Since these decisions are shared across all scenarios, the same physical plan
+must be executable regardless of which demand realization occurs.
+
+## 19.6 Scenario-specific future constraints
+
+For each scenario and future horizon day, the model enforces:
+
+- route-specific vehicle capacity;
+- route/delivery linking;
+- at most one route per cashpoint/day;
+- vault capacity;
+- fleet availability;
+- cluster visit limits;
+- cashpoint capacity;
+- safety-stock accounting;
+- lost-demand bounds.
+
+## 19.7 Receding-horizon execution
+
+The scenario-specific future decisions are not executed directly.
+
+At day (k):
+
+1. observe current inventory;
+2. generate scenarios for days (k,ldots,k+H-1);
+3. solve the stochastic IRP;
+4. execute only (z^0,q^0);
+5. observe actual demand;
+6. update inventory and realized cash-out;
+7. shift to day (k+1);
+8. generate new scenarios and solve again.
+
+Therefore the operational policy is:
+
+[
+pi(S_k)
+ightarrow
+a_k
+ightarrow
+W_k
+ightarrow
+S_{k+1}
+]
+
+where:
+
+- (S_k): observed cash state;
+- (a_k): executed route/replenishment decision;
+- (W_k): realized demand uncertainty;
+- (S_{k+1}): updated state.
+
+## 19.8 Deterministic rolling benchmark
+
+A deterministic rolling policy uses the same state-update and receding-horizon
+architecture but solves the deterministic joint IRP using point forecasts.
+
+Both policies are evaluated on the same out-of-sample realized demand path.
+
+The comparison reports:
+
+[
+Delta C =
+C_{deterministic rolling}
+-
+C_{stochastic rolling}
+]
+
+and:
+
+[
+Delta L =
+L_{deterministic rolling}
+-
+L_{stochastic rolling}
+]
+
+for realized cost and realized cash-out respectively.
+
+Unlike the deterministic staged-vs-joint benchmark, these quantities are
+path-dependent. A stochastic policy is not expected to dominate on every
+single realization; its purpose is to improve decision quality under repeated
+uncertainty across a distribution of possible demand paths.
+
+# 20. Scenario generation
+
+Scenario demand uses multiplicative lognormal forecast error:
+
+[
+	ilde d_{omega it}
+=
+d_{it}epsilon_{omega it}
+]
+
+with:
+
+[
+epsilon_{omega it}
+sim
+Lognormal
+left(
+-rac{sigma^2}{2},
+sigma
+ight)
+]
+
+The implementation currently uses independent synthetic multipliers.
+
+Research extensions include correlated cashpoint shocks, common demand
+factors, regime-switching volatility, scenario reduction, empirical residual
+bootstrap, and distributionally robust ambiguity sets.
+
+# 21. Current stochastic scope
+
+The model is deliberately a **two-stage stochastic approximation inside a
+rolling horizon**.
+
+It does not yet impose multistage non-anticipativity among future scenario
+branches.
+
+A full multistage version would require scenario-tree nodes or policy-based
+recourse so that scenarios sharing the same history also share decisions until
+they diverge.
