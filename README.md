@@ -17,7 +17,7 @@ The repository focuses on **prescriptive analytics**: models that choose actions
 | [Fraud Alert Triage](projects/fraud-alert-triage/) | Select alerts for investigation under scarce analyst capacity | Binary optimization | Implemented |
 | [Intraday Liquidity](projects/intraday-liquidity/) | Payment release/sequencing under liquidity limits | MILP, scheduling | Implemented |
 | [ATM Cash Replenishment](projects/atm-cash-replenishment/) | Replenishment timing and quantities | Multi-period MILP | Implemented |
-| [Cash Supply Chain Optimization](projects/cash-supply-chain-optimization/) | Joint ATM/branch replenishment and CIT routing with staged benchmark and simulation | Inventory Routing MILP, route-column optimization, Monte Carlo simulation | Flagship |
+| [Cash Supply Chain Optimization](projects/cash-supply-chain-optimization/) | ATM/branch cash replenishment and CIT routing under repeated demand uncertainty | Stochastic rolling-horizon IRP, route-column MILP, Monte Carlo simulation | Flagship |
 | [Payment Routing](projects/payment-routing/) | Route payment segments across processors | Assignment MILP | Implemented |
 | [Deposit Pricing & Retention](projects/deposit-pricing-and-retention/) | Segment-level deposit rate offers under a funding target | MILP, retention-response optimization | Implemented |
 
