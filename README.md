@@ -18,6 +18,7 @@ The repository focuses on **prescriptive analytics**: models that choose actions
 | [Intraday Liquidity](projects/intraday-liquidity/) | Payment release/sequencing under liquidity limits | MILP, scheduling | Implemented |
 | [ATM Cash Replenishment](projects/atm-cash-replenishment/) | Replenishment timing and quantities | Multi-period MILP | Implemented |
 | [Payment Routing](projects/payment-routing/) | Route payment segments across processors | Assignment MILP | Implemented |
+| [Deposit Pricing & Retention](projects/deposit-pricing-and-retention/) | Segment-level deposit rate offers under a funding target | MILP, retention-response optimization | Implemented |
 
 ## Design principles
 
@@ -70,7 +71,8 @@ python -m banking_optimization.alm
 │   ├── fraud-alert-triage/
 │   ├── intraday-liquidity/
 │   ├── atm-cash-replenishment/
-│   └── payment-routing/
+│   ├── payment-routing/
+│   └── deposit-pricing-and-retention/
 ├── src/
 │   └── banking_optimization/
 ├── tests/
