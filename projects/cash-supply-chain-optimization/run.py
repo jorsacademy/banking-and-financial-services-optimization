@@ -1,7 +1,11 @@
-"""Run optimization, simulation, and fleet sensitivity."""
+"""Run staged and joint cash-supply-chain experiments."""
 
 from pathlib import Path
 
+from cash_supply_chain.joint_irp import (
+    compare_staged_and_joint,
+    solve_joint_irp,
+)
 from cash_supply_chain.model import default_problem, solve
 from cash_supply_chain.routing import route_plan
 from cash_supply_chain.simulation import (
@@ -13,26 +17,56 @@ from cash_supply_chain.simulation import (
 
 if __name__ == "__main__":
     problem = default_problem()
-    result = solve(problem)
-    simulation = simulate_plan(result, problem)
-    summary = summarize_simulation(simulation)
+
+    staged = solve(problem)
+    staged_routes = route_plan(staged, problem)
+
+    joint = solve_joint_irp(problem)
+    comparison = compare_staged_and_joint(problem)
+
+    staged_simulation = simulate_plan(staged, problem)
+    joint_simulation = simulate_plan(joint, problem)
+    staged_summary = summarize_simulation(staged_simulation)
+    joint_summary = summarize_simulation(joint_simulation)
+
     sensitivity = fleet_sensitivity(problem)
-    routes = route_plan(result, problem)
 
     output_dir = Path(__file__).resolve().parent / "outputs"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    result.deliveries.to_csv(output_dir / "deliveries.csv")
-    result.visits.to_csv(output_dir / "visits.csv")
-    result.end_inventory.to_csv(output_dir / "end_inventory.csv")
-    result.shortage.to_csv(output_dir / "planned_shortage.csv")
-    result.vehicles.to_csv(output_dir / "vehicles.csv")
-    result.cost_breakdown.to_csv(output_dir / "cost_breakdown.csv")
-    simulation.to_csv(output_dir / "monte_carlo_simulation.csv", index=False)
-    summary.to_csv(output_dir / "simulation_summary.csv")
-    sensitivity.to_csv(output_dir / "fleet_sensitivity.csv", index=False)
-    routes.to_csv(output_dir / "cit_routes.csv", index=False)
+    staged.deliveries.to_csv(output_dir / "staged_deliveries.csv")
+    staged_routes.to_csv(output_dir / "staged_cit_routes.csv", index=False)
 
-    print("total_cost:", round(result.total_cost, 4))
-    print(summary.round(4).to_string())
+    joint.deliveries.to_csv(output_dir / "joint_deliveries.csv")
+    joint.visits.to_csv(output_dir / "joint_visits.csv")
+    joint.end_inventory.to_csv(output_dir / "joint_end_inventory.csv")
+    joint.shortage.to_csv(output_dir / "joint_planned_shortage.csv")
+    joint.selected_routes.to_csv(output_dir / "joint_cit_routes.csv", index=False)
+    joint.cost_breakdown.to_csv(output_dir / "joint_cost_breakdown.csv")
+
+    comparison.to_csv(output_dir / "staged_vs_joint.csv")
+
+    staged_simulation.to_csv(
+        output_dir / "staged_monte_carlo_simulation.csv",
+        index=False,
+    )
+    joint_simulation.to_csv(
+        output_dir / "joint_monte_carlo_simulation.csv",
+        index=False,
+    )
+    staged_summary.to_csv(output_dir / "staged_simulation_summary.csv")
+    joint_summary.to_csv(output_dir / "joint_simulation_summary.csv")
+
+    sensitivity.to_csv(output_dir / "fleet_sensitivity.csv", index=False)
+
+    print("\nStaged vs joint IRP")
+    print(comparison.round(4).to_string())
+
+    print("\nStaged simulation")
+    print(staged_summary.round(4).to_string())
+
+    print("\nJoint IRP simulation")
+    print(joint_summary.round(4).to_string())
+
+    print("\nFleet sensitivity")
     print(sensitivity.round(4).to_string(index=False))
