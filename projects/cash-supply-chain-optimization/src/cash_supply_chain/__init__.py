@@ -13,3 +13,17 @@ __all__ = [
     "default_problem",
     "solve",
 ]
+
+from .joint_irp import (
+    JointIRPResult,
+    compare_staged_and_joint,
+    generate_route_catalog,
+    solve_joint_irp,
+)
+
+__all__ += [
+    "JointIRPResult",
+    "compare_staged_and_joint",
+    "generate_route_catalog",
+    "solve_joint_irp",
+]
