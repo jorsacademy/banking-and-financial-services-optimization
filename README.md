@@ -8,7 +8,7 @@ The repository focuses on **prescriptive analytics**: models that choose actions
 
 | Project | Core decision | Methods | Status |
 |---|---|---|---|
-| [Asset-Liability Management](projects/asset-liability-management/) | Balance-sheet allocation across assets, deposits, wholesale funding, and hedges | LP, multi-period optimization, scenario analysis | Implemented |
+| [Asset-Liability Management](projects/asset-liability-management/) | Adaptive balance-sheet, funding, and hedge policy on an interest-rate scenario tree | LP, multi-period stochastic programming, sensitivity analysis | Flagship |
 | [Credit & Capital Allocation](projects/credit-capital-allocation/) | Which exposures to approve/fund under capital and concentration limits | MILP | Implemented |
 | [Loan Pricing & Limit Optimization](projects/loan-pricing-and-limit-optimization/) | Customer-level rate and credit-limit decisions | MILP, predict-then-optimize | Implemented |
 | [Liquidity & Funding Optimization](projects/liquidity-and-funding-optimization/) | Funding mix and liquidity buffer decisions | LP, stress scenarios | Implemented |
