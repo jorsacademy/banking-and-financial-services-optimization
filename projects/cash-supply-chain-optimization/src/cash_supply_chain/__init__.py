@@ -47,3 +47,19 @@ __all__ += [
     "run_rolling_horizon",
     "solve_stochastic_horizon",
 ]
+
+from .multistage_cvar_irp import (
+    MultistageCVaRResult,
+    ScenarioTree,
+    compare_risk_attitudes,
+    generate_binary_scenario_tree,
+    solve_multistage_cvar_irp,
+)
+
+__all__ += [
+    "MultistageCVaRResult",
+    "ScenarioTree",
+    "compare_risk_attitudes",
+    "generate_binary_scenario_tree",
+    "solve_multistage_cvar_irp",
+]
