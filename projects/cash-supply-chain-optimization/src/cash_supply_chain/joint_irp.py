@@ -394,12 +394,22 @@ def solve_joint_irp(
 
 def compare_staged_and_joint(
     problem: CashSupplyChainProblem | None = None,
+    staged: CashSupplyChainResult | None = None,
+    joint: JointIRPResult | None = None,
+    staged_routes: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
-    """Compare the staged replenishment+routing baseline to the joint IRP."""
+    """Compare the staged replenishment+routing baseline to the joint IRP.
+
+    Precomputed solutions can be supplied to avoid re-solving expensive models.
+    """
     p = problem or default_problem()
 
-    staged: CashSupplyChainResult = solve_staged(p)
-    staged_routes = route_plan(staged, p)
+    staged = staged or solve_staged(p)
+    staged_routes = (
+        staged_routes
+        if staged_routes is not None
+        else route_plan(staged, p)
+    )
     staged_distance = (
         float(staged_routes["distance"].sum())
         if not staged_routes.empty
@@ -409,7 +419,7 @@ def compare_staged_and_joint(
         staged.total_cost + p.distance_cost_per_unit * staged_distance
     )
 
-    joint = solve_joint_irp(p)
+    joint = joint or solve_joint_irp(p)
     joint_distance = (
         float(joint.selected_routes["distance"].sum())
         if not joint.selected_routes.empty
