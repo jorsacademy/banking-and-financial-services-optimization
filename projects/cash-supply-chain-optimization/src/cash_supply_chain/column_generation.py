@@ -713,6 +713,49 @@ def solve_route_column_generation(
     )
 
 
+
+def solve_full_catalog_route_master(
+    problem: CashSupplyChainProblem,
+    required_delivery: pd.Series,
+) -> tuple[float, pd.DataFrame]:
+    """Validation benchmark that enumerates every feasible routing column.
+
+    This deliberately defeats the purpose of column generation and should be
+    used only on small instances to verify the generated-column algorithms.
+    """
+    required = _validate_requirements(
+        problem,
+        required_delivery,
+    )
+    if required.empty:
+        return 0.0, pd.DataFrame()
+
+    active = list(required.index)
+    columns: dict[tuple[str, ...], RouteColumn] = {}
+
+    max_size = min(problem.stops_per_vehicle, len(active))
+    for size in range(1, max_size + 1):
+        for subset in combinations(active, size):
+            key = _route_key(subset)
+            load = float(required.loc[list(key)].sum())
+            if load > problem.vehicle_capacity + 1e-8:
+                continue
+            columns[key] = _make_route_column(
+                problem,
+                required,
+                key,
+            )
+
+    objective, values = _solve_restricted_integer_master(
+        problem,
+        required,
+        columns,
+    )
+    return objective, _selected_route_frame(
+        columns,
+        values,
+    )
+
 def _choose_ryan_foster_pair(
     active: list[str],
     columns: dict[tuple[str, ...], RouteColumn],
