@@ -577,7 +577,17 @@ def solve_stochastic_horizon(
             }
         )
 
-    first_day_routes = pd.DataFrame(route_rows)
+    first_day_routes = pd.DataFrame(
+        route_rows,
+        columns=[
+            "day",
+            "route_id",
+            "sequence",
+            "load",
+            "distance",
+            "stop_count",
+        ],
+    )
 
     expected_cashout = 0.0
     expected_safety_shortfall = 0.0
