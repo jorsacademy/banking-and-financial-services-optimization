@@ -1,104 +1,148 @@
 # Cash Supply Chain Optimization
 
-An integrated optimization and simulation project for daily cash operations across a synthetic ATM and branch network.
+An integrated Operations Research project for daily cash operations across a synthetic ATM and branch network.
 
-The project combines four decision layers:
+The project now contains two architectures:
 
-1. cash replenishment planning;
-2. cash-in-transit resource planning;
-3. small-network route construction;
-4. forecast-error simulation and what-if analysis.
+1. a **staged baseline** that solves replenishment/fleet decisions first and routing second;
+2. a **joint Inventory Routing Problem (IRP)** that chooses replenishment quantities and CIT routes in the same MILP.
 
-The goal is to minimize total operating cost while maintaining service levels and respecting physical cash, fleet, vault, and cashpoint constraints.
+The joint IRP is the primary model.
 
-## Why this is broader than ATM inventory control
+## Decision layers
 
-A cashpoint should not be optimized in isolation. Replenishment decisions compete for:
+The project combines:
 
-- central-vault preparation capacity;
-- CIT vehicle capacity;
-- available daily vehicle count;
-- route/cluster visit capacity;
-- cashpoint storage capacity;
-- cash tied up as idle inventory.
+- cash replenishment planning;
+- cashpoint inventory control;
+- CIT vehicle deployment;
+- route selection;
+- route-specific delivered cash;
+- central-vault dispatch capacity;
+- service-level protection;
+- forecast-error simulation;
+- what-if analysis.
 
-A lower inventory target can reduce holding cost but increase visit frequency and cash-out risk. Larger deliveries reduce visit frequency but increase idle cash. The model represents these trade-offs jointly.
+The model is designed to expose the trade-off among idle cash, visit frequency, route distance, fleet cost, handling cost, and cash-out risk.
 
-## Optimization decisions
+## Joint Inventory Routing Problem
 
-For each cashpoint and day:
+Module:
 
-- replenishment amount;
-- whether a CIT visit occurs;
-- end-of-day cash inventory;
-- service shortfall.
+```text
+cash_supply_chain.joint_irp
+```
 
-For each day:
+For every planning day, the model selects from an enumerated catalog of feasible CIT routes.
 
-- number of deployed CIT vehicles.
+Each candidate route:
 
-The optimizer minimizes:
+- starts and ends at the depot;
+- contains at most the maximum stops per vehicle;
+- uses the exact minimum-distance stop order for that subset;
+- has an explicit route distance;
+- has a route-specific visit cost.
+
+The MILP jointly chooses:
+
+- which routes to operate;
+- how much cash each selected route delivers to each included cashpoint;
+- end-of-day inventory;
+- safety-stock shortfall.
+
+This means route distance is no longer calculated after replenishment decisions have already been fixed. It is part of the replenishment objective itself.
+
+## Objective
+
+The joint model minimizes:
 
 - cash handling cost;
 - end-of-day idle-cash holding cost;
 - cashpoint visit cost;
-- deployed-vehicle cost;
+- fixed CIT vehicle/route cost;
+- route-distance cost;
 - service-shortfall penalty.
 
-## Operational constraints
+A longer or geographically inefficient replenishment plan can therefore lose against a slightly different inventory policy with better route economics.
 
-The MILP includes:
+## Constraints
 
-- daily inventory conservation;
+The integrated MILP includes:
+
+- multi-period inventory conservation;
 - cashpoint capacity;
 - cashpoint-specific maximum delivery;
 - safety-stock targets;
-- replenishment/visit linking;
 - central-vault daily dispatch capacity;
-- vehicle cash-carrying capacity;
-- maximum stops per vehicle;
-- maximum available vehicles per day;
-- cluster-level visit limits.
+- route-specific vehicle cash capacity;
+- maximum stops embedded in route generation;
+- maximum routes/vehicles per day;
+- at most one route visit per cashpoint/day;
+- cluster-level daily visit limits.
 
-## CIT routing
+## Route catalog
 
-After the replenishment plan is solved, daily planned visits are routed.
+For the small synthetic network, all cashpoint subsets up to the stop limit are enumerated.
 
-For the small synthetic instance, route generation is exact:
+For each subset, the best depot tour is computed exactly.
 
-- each visited cashpoint is assigned to one route;
-- vehicle load cannot exceed capacity;
-- route stop count cannot exceed the operational limit;
-- stop order minimizes Euclidean travel distance;
-- the final partition minimizes total route distance for the available vehicles.
+With six cashpoints and at most three stops per route, the route catalog contains:
 
-The routing implementation is deliberately designed for small educational networks. Larger networks would require scalable VRP decomposition, heuristics, metaheuristics, or commercial/open-source routing solvers.
+```text
+C(6,1) + C(6,2) + C(6,3) = 41
+```
+
+candidate routes per day.
+
+The optimization then selects a subset of these route columns.
+
+This is a set-partitioning / route-selection formulation rather than an arc-by-arc VRP formulation.
+
+## Staged baseline
+
+The previous architecture remains available as a benchmark:
+
+```text
+replenishment + fleet MILP
+            ↓
+post-optimization exact routing
+```
+
+Its routing distance is added to the staged planning cost to obtain a comparable integrated cost.
+
+The project reports:
+
+```text
+cost_improvement_vs_staged
+    = staged integrated cost - joint IRP cost
+```
+
+Because the staged plan is route-feasible for the synthetic instance, it provides a valid benchmark for the joint formulation.
 
 ## Forecast-error simulation
 
-The optimized plan is also evaluated under stochastic demand errors.
+Both staged and joint plans are evaluated under the same Monte Carlo demand perturbations.
 
-A Monte Carlo layer perturbs forecast net withdrawals and reports:
+Simulation reports:
 
 - mean cash-out volume;
 - 95th-percentile cash-out volume;
 - mean idle cash;
 - mean service-event rate.
 
-This separates deterministic planning quality from robustness to forecast error.
+This makes it possible to distinguish optimization-cost improvement from out-of-sample service robustness.
 
-## What-if analysis
+## Fleet sensitivity
 
-The current experiment layer includes fleet sensitivity:
+The staged planning layer is also re-solved across alternative maximum fleet sizes to show:
 
-- re-solve with alternative maximum daily vehicle counts;
-- compare feasibility;
-- total cost;
-- planned service shortage;
+- feasibility;
+- cost;
+- planned shortage;
 - total visits;
 - vehicle-days.
 
-The architecture can be extended to safety-stock, interest-cost, CIT-cost, cashpoint-capacity, and demand-volatility scenarios.
+The same pattern can be extended to joint-IRP sensitivities.
 
 ## Repository structure
 
@@ -112,10 +156,9 @@ cash-supply-chain-optimization/
         ├── __init__.py
         ├── model.py
         ├── routing.py
+        ├── joint_irp.py
         └── simulation.py
 ```
-
-Tests live in the umbrella repository's `tests/` directory and run in CI.
 
 ## Run
 
@@ -126,50 +169,86 @@ pip install -e ".[dev]"
 python projects/cash-supply-chain-optimization/run.py
 ```
 
-Generated outputs are written to:
+The runner solves both architectures and writes:
 
 ```text
-projects/cash-supply-chain-optimization/outputs/
-├── deliveries.csv
-├── visits.csv
-├── end_inventory.csv
-├── planned_shortage.csv
-├── vehicles.csv
-├── cost_breakdown.csv
-├── cit_routes.csv
-├── monte_carlo_simulation.csv
-├── simulation_summary.csv
+outputs/
+├── staged_deliveries.csv
+├── staged_cit_routes.csv
+├── joint_deliveries.csv
+├── joint_visits.csv
+├── joint_end_inventory.csv
+├── joint_planned_shortage.csv
+├── joint_cit_routes.csv
+├── joint_cost_breakdown.csv
+├── staged_vs_joint.csv
+├── staged_monte_carlo_simulation.csv
+├── joint_monte_carlo_simulation.csv
+├── staged_simulation_summary.csv
+├── joint_simulation_summary.csv
 └── fleet_sensitivity.csv
 ```
 
-The outputs directory is git-ignored because it contains generated artifacts.
+Generated outputs are git-ignored.
 
-Run the dedicated tests with:
+## Tests
 
 ```bash
-pytest tests/test_cash_supply_chain.py tests/test_cash_supply_chain_routing.py
+pytest \
+  tests/test_cash_supply_chain.py \
+  tests/test_cash_supply_chain_routing.py \
+  tests/test_cash_supply_chain_joint_irp.py
 ```
 
-## Extension path
+The tests validate:
 
-Natural next steps include:
+- inventory conservation;
+- vault capacity;
+- route-specific vehicle capacity;
+- maximum daily route count;
+- cluster visit limits;
+- delivery/visit linking;
+- route catalog stop limits;
+- objective/cost-breakdown consistency;
+- joint-vs-staged benchmark consistency;
+- Monte Carlo reproducibility.
 
-- cash deposit and withdrawal forecasts as separate stochastic processes;
+## Scaling path
+
+The current route-column formulation is exact and appropriate for a deliberately small research instance.
+
+Larger networks would require methods such as:
+
+- column generation;
+- branch-and-price;
+- route-generation heuristics;
+- decomposition by cash center/geography;
+- rolling-horizon optimization;
+- neighborhood search;
+- adaptive large neighborhood search;
+- commercial VRP engines;
+- stochastic or robust IRP formulations.
+
+## Next research extensions
+
+Natural extensions include:
+
+- separate deposit and withdrawal processes;
+- cash collection as well as delivery;
 - recycling ATM behavior;
-- cassette/denomination constraints;
-- branch teller and lobby-ATM pooling;
+- cassette and denomination constraints;
 - multiple cash management centers;
-- collection as well as replenishment decisions;
-- vehicle insurance limits;
-- route time windows and SLAs;
+- route time windows;
+- crew shift limits;
+- insurance/vehicle value limits;
 - travel-time uncertainty;
-- emergency/ad-hoc visits;
-- rolling-horizon dynamic re-optimization;
-- joint replenishment-routing optimization;
-- predictive maintenance interactions.
+- emergency visits;
+- stochastic demand scenarios;
+- rolling-horizon re-optimization;
+- scenario-dependent route recourse.
 
 ## Limitations
 
-This is a synthetic educational decision model. It is not a production cash-management, vault, ATM, branch, CIT, security, routing, or treasury system.
+This is a synthetic educational optimization system. It is not a production cash-management, ATM, branch, vault, CIT, security, routing, treasury, or operational-risk platform.
 
-Real deployment would require institution-specific forecasting, security rules, vehicle and crew constraints, geographic data, cash-center processes, contractual SLAs, denomination/cassette logic, operating calendars, insurance rules, and governance controls.
+Real deployment requires institution-specific forecasting, security policy, geographic data, cash-center processes, crew/vehicle rules, denomination logic, SLAs, calendars, insurance constraints, auditability, and governance.
