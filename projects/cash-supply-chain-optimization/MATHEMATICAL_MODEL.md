@@ -554,3 +554,269 @@ branches.
 A full multistage version would require scenario-tree nodes or policy-based
 recourse so that scenarios sharing the same history also share decisions until
 they diverge.
+
+
+# 22. Full multistage scenario-tree IRP
+
+The multistage formulation replaces scenario-indexed future decisions with
+**node-indexed decisions**.
+
+Let:
+
+- \(N\): all scenario-tree nodes;
+- \(N^D\): decision nodes;
+- \(N^R\): realized-demand/state nodes;
+- \(L\): terminal leaves;
+- \(\pi(n)\): parent of node \(n\);
+- \(p_n\): probability of reaching node \(n\).
+
+A node represents one information state. Therefore all scenario paths with the
+same observed history share the same node and the same decision variables.
+
+This is structural non-anticipativity.
+
+## 22.1 Timing convention
+
+The root is the state before day-1 demand.
+
+At a decision node \(n \in N^D\), routes and delivery quantities are selected.
+
+Demand then realizes and the process moves to one child state node.
+
+At the child node, inventory and cash-out are observed before the next routing
+decision is made.
+
+For a three-day binary tree, decisions occur at:
+
+\`\`\`text
+stage 0: 1 root decision
+stage 1: 2 decisions
+stage 2: 4 decisions
+\`\`\`
+
+while stage 3 contains eight terminal realized states.
+
+## 22.2 Node-indexed routing decisions
+
+For decision node \(n\) and route \(r\):
+
+\[
+z_{nr}\in\{0,1\}
+\]
+
+selects route \(r\).
+
+For cashpoint \(i\in I_r\):
+
+\[
+q_{nri}\ge0
+\]
+
+is the amount delivered on that route.
+
+There is only one \(z_{nr}\) and one \(q_{nri}\) for a given information state,
+regardless of how many terminal paths descend from that node.
+
+## 22.3 State transition on tree edges
+
+For realized node \(m\) with parent decision node \(n=\pi(m)\):
+
+\[
+B_{mi}
+=
+B_{ni}
++
+\sum_{r:i\in I_r}q_{nri}
++
+l_{mi}
+-
+\tilde d_{mi}
+\]
+
+where \(B_{ni}\) is replaced by initial cash when \(n\) is the root.
+
+The cash-out variable is:
+
+\[
+l_{mi}\ge0
+\]
+
+and receives a high penalty.
+
+## 22.4 Expected operating cost
+
+Let \(C_n^{route}\) and \(C_n^{delivery}\) denote costs incurred at decision node
+\(n\).
+
+Let state cost at realized node \(m\) contain holding, safety-shortfall, and
+cash-out terms.
+
+The risk-neutral expected objective is:
+
+\[
+\mathbb{E}[C]
+=
+\sum_{n\in N^D}
+p_n
+\left(
+C_n^{route}
++
+C_n^{delivery}
+\right)
++
+\sum_{m\in N^R}
+p_m
+C_m^{state}
+\]
+
+This is equivalent to the probability-weighted cost of terminal paths when the
+tree probabilities are consistent.
+
+# 23. Terminal path cost
+
+For terminal leaf \(\ell\), define the unique root-to-leaf path:
+
+\[
+P(\ell)
+\]
+
+The total cost on that path is:
+
+\[
+C_\ell
+=
+\sum_{n\in P(\ell)\cap N^D}
+\left(
+C_n^{route}
++
+C_n^{delivery}
+\right)
++
+\sum_{m\in P(\ell)\cap N^R}
+C_m^{state}
+\]
+
+These leaf costs define the tail-risk distribution.
+
+# 24. CVaR risk aversion
+
+Let:
+
+- \(\alpha\in(0,1)\): CVaR confidence level;
+- \(\eta\): VaR threshold variable;
+- \(\xi_\ell\ge0\): excess loss for terminal leaf \(\ell\).
+
+For every terminal leaf:
+
+\[
+\xi_\ell
+\ge
+C_\ell-\eta
+\]
+
+The standard Rockafellar-Uryasev CVaR representation is:
+
+\[
+CVaR_\alpha(C)
+=
+\eta
++
+\frac{1}{1-\alpha}
+\sum_{\ell\in L}
+p_\ell\xi_\ell
+\]
+
+The risk-averse objective is:
+
+\[
+\min
+\quad
+\mathbb{E}[C]
++
+\lambda
+CVaR_\alpha(C)
+\]
+
+where:
+
+\[
+\lambda\ge0
+\]
+
+controls risk aversion.
+
+When \(\lambda=0\), the formulation is risk-neutral.
+
+As \(\lambda\) increases, the optimizer can accept higher expected operating
+cost in exchange for lower tail cost.
+
+# 25. Risk-neutral vs risk-averse comparison
+
+The project solves both policies on the exact same scenario tree.
+
+Reported metrics include:
+
+- expected cost;
+- CVaR cost;
+- worst terminal-path cost;
+- expected cash-out;
+- root-stage replenishment;
+- probability-weighted route usage.
+
+The key trade-offs are:
+
+\[
+\Delta E
+=
+E[C]_{risk\ averse}
+-
+E[C]_{risk\ neutral}
+\]
+
+and:
+
+\[
+\Delta CVaR
+=
+CVaR_{risk\ neutral}
+-
+CVaR_{risk\ averse}
+\]
+
+A positive \(\Delta CVaR\) means the risk-averse policy reduced tail cost.
+
+# 26. Relationship to rolling-horizon stochastic IRP
+
+The two stochastic layers answer different questions.
+
+The rolling-horizon model uses:
+
+\`\`\`text
+two-stage scenario recourse
++
+receding-horizon re-optimization
+\`\`\`
+
+The multistage model uses:
+
+\`\`\`text
+explicit scenario tree
++
+history-dependent node decisions
++
+full tree non-anticipativity
++
+CVaR terminal-path risk
+\`\`\`
+
+The multistage formulation is stronger conceptually but grows exponentially
+with branching depth.
+
+For larger instances, likely solution methods include:
+
+- scenario reduction;
+- progressive hedging;
+- nested Benders decomposition;
+- stochastic dual dynamic programming for compatible relaxations;
+- branch-and-price with scenario decomposition;
+- approximate dynamic programming / policy approximation.
