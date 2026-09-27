@@ -820,3 +820,330 @@ For larger instances, likely solution methods include:
 - stochastic dual dynamic programming for compatible relaxations;
 - branch-and-price with scenario decomposition;
 - approximate dynamic programming / policy approximation.
+
+
+# 27. Scenario reduction
+
+Let terminal scenarios be indexed by \(\omega\in\Omega\), with probabilities
+\(p_\omega\).
+
+Each terminal scenario is represented by a flattened demand-path vector:
+
+\[
+v_\omega
+=
+(
+d_{\omega,1,1},
+\ldots,
+d_{\omega,T,|I|}
+)
+\]
+
+covering all stages and cashpoints.
+
+Each dimension is standardized using probability-weighted mean and variance.
+Distance between terminal scenarios is then:
+
+\[
+D(\omega,\omega')
+=
+\left\|
+\tilde v_\omega
+-
+\tilde v_{\omega'}
+\right\|_2
+\]
+
+A forward-selection set \(S\subseteq\Omega\) is built greedily.
+
+At each selection step, candidate scenario \(j\) is evaluated by:
+
+\[
+\Phi(S\cup\{j\})
+=
+\sum_{\omega\in\Omega}
+p_\omega
+\min_{s\in S\cup\{j\}}
+D(\omega,s)
+\]
+
+The candidate producing the smallest probability-weighted distortion is added.
+
+After selecting the target number of representative leaves, every original
+scenario is assigned to its nearest retained scenario:
+
+\[
+a(\omega)
+=
+\arg\min_{s\in S}
+D(\omega,s)
+\]
+
+The reduced probability of representative \(s\) is:
+
+\[
+\hat p_s
+=
+\sum_{\omega:a(\omega)=s}
+p_\omega
+\]
+
+so total probability is preserved:
+
+\[
+\sum_{s\in S}\hat p_s=1
+\]
+
+The reduced multistage tree is reconstructed from the retained root-to-leaf
+histories. Internal-node probability equals the total probability of retained
+leaves descending from that node.
+
+The reported reduction distortion is:
+
+\[
+\mathcal{D}
+=
+\sum_{\omega\in\Omega}
+p_\omega
+D(\omega,a(\omega))
+\]
+
+This is a scenario-representation diagnostic, not an optimization-error bound.
+
+# 28. Progressive Hedging decomposition
+
+The extensive-form multistage model couples terminal scenarios through
+non-anticipative decisions at shared history nodes.
+
+Progressive Hedging decomposes the model by terminal scenario while
+coordinating those shared decisions iteratively.
+
+Let:
+
+- \(\omega\): terminal scenario;
+- \(n\): information-history node appearing on scenario \(\omega\)'s path;
+- \(x_{\omega n}\): scenario-copy decision vector at node \(n\);
+- \(p_\omega\): scenario probability;
+- \(\bar x_n\): consensus decision at node \(n\).
+
+The probability-weighted consensus is:
+
+\[
+\bar x_n
+=
+\frac{
+\sum_{\omega:n\in P(\omega)}
+p_\omega x_{\omega n}
+}{
+\sum_{\omega:n\in P(\omega)}
+p_\omega
+}
+\]
+
+Only scenarios sharing history node \(n\) participate in that consensus.
+
+## 28.1 Scenario subproblem
+
+Each scenario solves its own path MILP:
+
+\[
+\min
+\quad
+C_\omega(x_\omega)
++
+w_\omega^\top x_\omega
++
+\rho
+\|x_\omega-\bar x\|_1
+\]
+
+subject to the physical inventory-routing constraints on that scenario path.
+
+The base cost \(C_\omega\) includes:
+
+- route cost;
+- distance cost;
+- handling cost;
+- inventory holding;
+- safety shortfall;
+- cash-out penalty.
+
+## 28.2 Why L1 instead of quadratic PH
+
+Classical Progressive Hedging uses:
+
+\[
+\frac{\rho}{2}
+\|x_\omega-\bar x\|_2^2
+\]
+
+The project uses SciPy/HiGHS linear MILPs, so the proximal term is replaced by
+an L1 penalty.
+
+For binary route variable \(z\) and fixed consensus \(\bar z\):
+
+\[
+|z-\bar z|
+=
+z(1-2\bar z)
++
+\bar z
+\]
+
+Since \(\bar z\) is constant during a scenario solve, the variable part is
+linear.
+
+For continuous delivery \(q\), introduce:
+
+\[
+d^+_{\omega n i}\ge0,
+\qquad
+d^-_{\omega n i}\ge0
+\]
+
+with:
+
+\[
+q_{\omega n i}
+-
+d^+_{\omega n i}
++
+d^-_{\omega n i}
+=
+\bar q_{ni}
+\]
+
+Then:
+
+\[
+|q_{\omega n i}-\bar q_{ni}|
+=
+d^+_{\omega n i}
++
+d^-_{\omega n i}
+\]
+
+at optimum.
+
+This is therefore an **L1 PH variant / decomposition heuristic**, not the
+standard quadratic PH algorithm.
+
+## 28.3 Multiplier update
+
+After solving all leaf subproblems and recomputing consensus, multipliers are
+updated as:
+
+\[
+w_{\omega n}^{k+1}
+=
+w_{\omega n}^{k}
++
+\rho
+\left(
+x_{\omega n}^{k+1}
+-
+\bar x_n^{k+1}
+\right)
+\]
+
+Separate penalty magnitudes are used for route binaries and delivery quantities
+because their numerical scales differ.
+
+## 28.4 Consensus residual
+
+Route residual is the maximum absolute disagreement:
+
+\[
+r_z
+=
+\max_{\omega,n,r}
+|z_{\omega nr}-\bar z_{nr}|
+\]
+
+Delivery disagreement is normalized by cashpoint maximum delivery:
+
+\[
+r_q
+=
+\max_{\omega,n,i}
+\frac{
+|q_{\omega ni}-\bar q_{ni}|
+}{
+Q_i
+}
+\]
+
+The overall reported residual is:
+
+\[
+r
+=
+\max(r_z,r_q)
+\]
+
+The PH process is marked converged when:
+
+\[
+r\le\epsilon
+\]
+
+for the configured tolerance.
+
+Because integer route decisions can oscillate, convergence is not guaranteed
+for every parameterization.
+
+# 29. Reduced-tree exact benchmark
+
+The scaling workflow is:
+
+\`\`\`text
+full scenario tree
+        ↓
+scenario reduction
+        ↓
+reduced scenario tree
+        ├── exact extensive-form MILP
+        └── L1 Progressive Hedging
+\`\`\`
+
+The exact reduced-tree model provides a validation reference.
+
+Before non-anticipativity residual reaches zero, the PH scenario-wise expected
+cost can be lower than the extensive-form optimum because scenario copies still
+have residual disagreement.
+
+Therefore:
+
+\[
+C_{PH}-C_{exact}
+\]
+
+is reported only as a cost difference diagnostic and is not automatically
+called an optimality gap.
+
+# 30. Computational interpretation
+
+Scenario reduction attacks the number of uncertainty paths.
+
+Progressive Hedging attacks the coupling across scenarios.
+
+They address different sources of complexity and can be combined:
+
+\[
+\text{large tree}
+\rightarrow
+\text{representative reduced tree}
+\rightarrow
+\text{parallelizable scenario subproblems}
+\]
+
+For larger implementations, natural extensions include:
+
+- parallel leaf-subproblem solves;
+- asynchronous PH;
+- adaptive penalty updates;
+- fixing stable binary decisions;
+- branch-and-price inside route subproblems;
+- nested decomposition for CVaR;
+- empirical scenario clustering;
+- scenario reduction with Wasserstein or transportation metrics.
