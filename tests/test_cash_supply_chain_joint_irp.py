@@ -20,8 +20,8 @@ def result(problem):
 
 
 @pytest.fixture(scope="module")
-def comparison(problem):
-    return compare_staged_and_joint(problem)
+def comparison(problem, result):
+    return compare_staged_and_joint(problem, joint=result)
 
 
 def test_route_catalog_respects_stop_limit(problem):
