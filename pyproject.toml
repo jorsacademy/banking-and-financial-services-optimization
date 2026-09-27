@@ -21,7 +21,7 @@ dev = [
 ]
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["src", "projects/cash-supply-chain-optimization/src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
