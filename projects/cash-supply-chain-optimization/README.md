@@ -2,14 +2,15 @@
 
 An integrated Operations Research project for daily cash operations across a synthetic ATM and branch network.
 
-The project now contains four architectures:
+The project now contains four optimization architectures plus a dedicated stochastic-scaling layer:
 
 1. a **staged baseline** that solves replenishment/fleet decisions first and routing second;
 2. a **deterministic joint Inventory Routing Problem (IRP)** that chooses replenishment quantities and CIT routes in the same MILP;
 3. a **stochastic rolling-horizon IRP** that repeatedly re-optimizes short-horizon route and replenishment decisions under demand scenarios;
-4. a **full multistage scenario-tree IRP with CVaR risk aversion**, where decisions are indexed by information-state nodes and expensive tail paths enter the objective explicitly.
+4. a **full multistage scenario-tree IRP with CVaR risk aversion**, where decisions are indexed by information-state nodes and expensive tail paths enter the objective explicitly;
+5. **scenario reduction + L1 Progressive Hedging decomposition** for scaling the multistage formulation.
 
-The multistage CVaR model is the most advanced formulation in the project.
+The multistage CVaR model is the richest formulation; the scaling layer addresses how to solve larger scenario sets without relying only on one monolithic extensive-form MILP.
 
 ## Decision layers
 
@@ -120,6 +121,106 @@ cost_improvement_vs_staged
 ```
 
 Because the staged plan is route-feasible for the synthetic instance, it provides a valid benchmark for the joint formulation.
+
+## Stochastic scaling: scenario reduction + Progressive Hedging
+
+Modules:
+
+\`\`\`text
+cash_supply_chain.scenario_reduction
+cash_supply_chain.progressive_hedging
+\`\`\`
+
+The exact multistage extensive form grows rapidly with branching depth. The project therefore includes two complementary scaling mechanisms.
+
+### Scenario reduction
+
+Terminal demand paths are flattened into stage-by-cashpoint vectors and compared using probability-weighted standardized Euclidean distance.
+
+A greedy forward-selection procedure chooses representative leaves. Every omitted scenario is assigned to its closest retained representative, and its probability mass is transferred to that leaf.
+
+The reduced scenario tree is then reconstructed from the retained root-to-leaf histories.
+
+This preserves:
+
+- total probability mass;
+- tree parent/child consistency;
+- shared information prefixes;
+- the original demand realization attached to every retained node.
+
+The reduction output reports:
+
+- original leaf count;
+- retained leaf count;
+- reduced node count;
+- scenario-to-representative assignment;
+- probability redistribution;
+- probability-weighted distortion.
+
+### L1 Progressive Hedging
+
+The project also decomposes the multistage problem by terminal path.
+
+Each leaf scenario solves its own route-column MILP. Decisions that belong to the same history node are coordinated through:
+
+- probability-weighted consensus;
+- scenario-specific multipliers;
+- route-selection proximal penalties;
+- delivery-deviation proximal penalties.
+
+Classic Progressive Hedging uses a quadratic proximal term. Because the implementation uses SciPy/HiGHS linear MILPs, this repository uses an **L1 Progressive Hedging variant**:
+
+- binary route deviations are linear directly;
+- continuous delivery deviations use positive/negative absolute-deviation variables.
+
+This should be treated as an educational decomposition heuristic rather than a claim of classical quadratic-PH convergence theory.
+
+The PH diagnostics report:
+
+- route-consensus residual;
+- normalized delivery-consensus residual;
+- maximum non-anticipativity residual;
+- decomposed expected scenario cost;
+- penalty parameters by iteration;
+- convergence status.
+
+### Exact benchmark on the reduced tree
+
+For validation, the reduced scenario tree can still be solved with the exact risk-neutral extensive form.
+
+The runner therefore compares:
+
+\`\`\`text
+exact reduced-tree extensive form
+vs.
+L1 Progressive Hedging decomposition
+\`\`\`
+
+The PH scenario cost can be optimistic while non-anticipativity residual remains positive, so the project does **not** label the difference an optimality gap unless consensus has actually converged.
+
+### Run
+
+\`\`\`bash
+python projects/cash-supply-chain-optimization/run_scaling.py
+\`\`\`
+
+The default experiment:
+
+\`\`\`text
+4-day binary tree
+→ 16 terminal scenarios
+→ reduce to 4 representative leaves
+→ solve reduced exact extensive form
+→ solve reduced tree with L1 Progressive Hedging
+\`\`\`
+
+To additionally solve the unreduced extensive form:
+
+\`\`\`bash
+python projects/cash-supply-chain-optimization/run_scaling.py --full-exact
+\`\`\`
+
+That option is intentionally explicit because full-tree solve time can grow quickly.
 
 ## Multistage scenario-tree IRP with CVaR
 
@@ -337,6 +438,8 @@ cash-supply-chain-optimization/
         ├── joint_irp.py
         ├── stochastic_rolling_horizon.py
         ├── multistage_cvar_irp.py
+        ├── scenario_reduction.py
+        ├── progressive_hedging.py
         └── simulation.py
 ```
 
@@ -353,6 +456,9 @@ python projects/cash-supply-chain-optimization/run_rolling_horizon.py
 
 # full multistage + CVaR experiment
 python projects/cash-supply-chain-optimization/run_multistage_cvar.py
+
+# scenario reduction + decomposition experiment
+python projects/cash-supply-chain-optimization/run_scaling.py
 ```
 
 The runner solves both architectures and writes:
@@ -392,7 +498,9 @@ pytest \
   tests/test_cash_supply_chain_routing.py \
   tests/test_cash_supply_chain_joint_irp.py \
   tests/test_cash_supply_chain_stochastic_rolling.py \
-  tests/test_cash_supply_chain_multistage_cvar.py
+  tests/test_cash_supply_chain_multistage_cvar.py \
+  tests/test_cash_supply_chain_scenario_reduction.py \
+  tests/test_cash_supply_chain_progressive_hedging.py
 ```
 
 The tests validate:
@@ -416,6 +524,11 @@ The tests validate:
 - tree-edge inventory conservation;
 - risk-neutral expected-cost optimality;
 - CVaR tail-cost trade-off;
+- scenario-reduction probability conservation;
+- reduced-tree solvability;
+- Progressive Hedging consensus construction;
+- PH residual diagnostics;
+- PH-vs-extensive-form benchmark plumbing;
 - Monte Carlo reproducibility.
 
 ## Scaling path
@@ -450,9 +563,10 @@ Natural extensions include:
 - emergency visits;
 - correlated cashpoint demand scenarios;
 - regime-dependent forecast errors;
-- scenario reduction;
-- CVaR / downside-risk objectives;
-- multistage scenario-tree recourse;
+- correlated scenario generation and scenario reduction under richer dependence;
+- nested decomposition for risk-averse CVaR;
+- branch-and-price inside scenario subproblems;
+- asynchronous / parallel Progressive Hedging;
 - distributionally robust demand sets.
 
 ## Limitations
