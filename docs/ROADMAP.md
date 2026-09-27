@@ -20,7 +20,7 @@ This umbrella repository is organized around banking decisions rather than algor
 
 - [x] ATM cash replenishment
 - [x] Payment routing
-- [ ] Deposit pricing and retention optimization
+- [x] Deposit pricing and retention optimization
 
 ## Common quality bar
 
