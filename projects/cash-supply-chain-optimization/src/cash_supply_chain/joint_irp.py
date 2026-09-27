@@ -324,8 +324,7 @@ def solve_joint_irp(
                 q0 + delivery_index[(day, route, cashpoint)]
             ]
             deliveries.loc[cashpoint, day] += amount
-            if amount > 1e-8:
-                visits.loc[cashpoint, day] = 1
+            visits.loc[cashpoint, day] = 1
             load += amount
 
         selected_route_rows.append(
