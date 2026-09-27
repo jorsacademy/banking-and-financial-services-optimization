@@ -163,6 +163,8 @@ def test_cvar_policy_tradeoff(small_problem, tree, neutral, risk_averse):
         tree=tree,
         cvar_alpha=0.75,
         risk_aversion=1.0,
+        neutral=neutral,
+        risk_averse=risk_averse,
     )
 
     assert set(comparison.index) == {"risk_neutral", "risk_averse"}
