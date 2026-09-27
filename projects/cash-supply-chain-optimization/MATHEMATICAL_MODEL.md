@@ -1147,3 +1147,217 @@ For larger implementations, natural extensions include:
 - nested decomposition for CVaR;
 - empirical scenario clustering;
 - scenario reduction with Wasserstein or transportation metrics.
+
+
+# 31. Route-column generation
+
+The routing scaling layer assumes that daily cash quantities have already been
+fixed by an upstream replenishment or inventory model.
+
+Let:
+
+- \(I\): cashpoints requiring a positive delivery;
+- \(R\): feasible vehicle routes, too large to enumerate in the master;
+- \(a_{ir}\in\{0,1\}\): whether route \(r\) visits cashpoint \(i\);
+- \(c_r\): total route cost;
+- \(V\): maximum available vehicles;
+- \(\lambda_r\): route-selection variable.
+
+The LP master is a set-partitioning model:
+
+\[
+\min \sum_{r\in R'} c_r \lambda_r
+\]
+
+subject to:
+
+\[
+\sum_{r\in R'} a_{ir}\lambda_r = 1
+\qquad \forall i\in I
+\]
+
+and:
+
+\[
+\sum_{r\in R'}\lambda_r \le V
+\]
+
+where \(R'\subset R\) is the current restricted column set.
+
+Artificial coverage variables with a large penalty are included during column
+generation so the restricted master remains feasible before sufficient real
+routes have been generated.
+
+# 32. Pricing problem
+
+Let:
+
+- \(\pi_i\): dual of the exact-cover constraint for cashpoint \(i\);
+- \(\mu\): dual of the fleet-count constraint.
+
+For a candidate feasible route \(r\), reduced cost is:
+
+\[
+\bar c_r
+=
+c_r
+-
+\sum_{i\in I} \pi_i a_{ir}
+-
+\mu
+\]
+
+A route is improving when:
+
+\[
+\bar c_r < 0
+\]
+
+The pricing oracle therefore solves:
+
+\[
+\min_{r\in R}
+\left[
+c_r
+-
+\sum_i \pi_i a_{ir}
+-
+\mu
+\right]
+\]
+
+subject to:
+
+- maximum stops per route;
+- fixed-delivery vehicle capacity;
+- depot start/end;
+- branch-node compatibility.
+
+The educational implementation searches feasible stop subsets exactly and uses
+the exact minimum-distance ordering for each subset.
+
+The route master itself therefore does not contain all routes up front,
+although the current exact pricing oracle remains combinatorial.
+
+A scalable implementation would replace this oracle with a
+resource-constrained shortest-path / elementary shortest-path pricing
+algorithm.
+
+# 33. Column-generation termination
+
+At each iteration:
+
+1. solve the restricted master LP;
+2. obtain \(\pi_i,\mu\);
+3. run pricing;
+4. add one or more negative reduced-cost routes;
+5. repeat.
+
+When exact pricing finds no route satisfying:
+
+\[
+\bar c_r < -\epsilon
+\]
+
+the restricted-master LP is optimal for the full LP relaxation.
+
+The generated route columns are then passed to a restricted binary master for
+an integer route plan.
+
+On small instances the result is checked against a full-catalog binary master.
+
+# 34. Ryan-Foster branch-and-price
+
+Solving a binary master only on root-node generated columns does not in general
+prove integer optimality because a column with nonnegative reduced cost at the
+root LP can become useful after branching.
+
+The project therefore includes Ryan-Foster pair branching.
+
+For a pair of cashpoints \((i,j)\), define:
+
+\[
+y_{ij}
+=
+\sum_{r:i,j\in r}\lambda_r
+\]
+
+If:
+
+\[
+0 < y_{ij} < 1
+\]
+
+the pair is fractional and can be branched on.
+
+## 34.1 Together branch
+
+Require \(i\) and \(j\) to be served by the same route.
+
+The pricing oracle accepts a route only if:
+
+\[
+i\in r
+\iff
+j\in r
+\]
+
+That is, a new route contains both or neither.
+
+## 34.2 Separate branch
+
+Require \(i\) and \(j\) not to share a route.
+
+Pricing enforces:
+
+\[
+\neg(i\in r \land j\in r)
+\]
+
+Every branch node then runs a fresh column-generation loop under its inherited
+pair restrictions.
+
+# 35. Branch-and-price bounds
+
+At branch node \(n\), the converged restricted-master LP gives a lower bound:
+
+\[
+LB_n
+\]
+
+A global feasible integer solution provides incumbent:
+
+\[
+UB
+\]
+
+The node is pruned when:
+
+\[
+LB_n \ge UB
+\]
+
+or when artificial coverage remains positive after exact pricing, indicating
+that the branch restrictions make the node infeasible.
+
+If the LP solution becomes integral, it is a valid incumbent candidate.
+
+# 36. Scope of the current branch-and-price implementation
+
+The implemented branch-and-price is exact for the fixed-delivery daily routing
+master provided that:
+
+- pricing is exact;
+- the branch tree is processed completely;
+- the configured node limit is not reached;
+- a Ryan-Foster pair can be identified whenever the LP is fractional.
+
+The result exposes an exact flag.
+
+If the node limit is reached or numerical degeneracy prevents a valid branching
+pair, the routine returns the best incumbent but marks the search non-exact.
+
+This branch-and-price layer is not yet the full multi-period inventory-routing
+master. It isolates and scales the route-column combinatorics, which is the
+natural precursor to deeper branch-price-and-cut integration with inventory
+and stochastic state variables.
