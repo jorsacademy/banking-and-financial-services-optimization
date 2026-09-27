@@ -82,10 +82,11 @@ def test_stochastic_horizon_first_stage_is_feasible(small_problem):
         <= small_problem.cashpoints["capacity"] + 1e-7
     ).all()
     assert len(result.first_day_routes) <= small_problem.maximum_vehicles_per_day
-    assert (
-        result.first_day_routes["load"]
-        <= small_problem.vehicle_capacity + 1e-7
-    ).all()
+    if not result.first_day_routes.empty:
+        assert (
+            result.first_day_routes["load"]
+            <= small_problem.vehicle_capacity + 1e-7
+        ).all()
     assert result.expected_cashout >= -1e-8
     assert result.expected_safety_shortfall >= -1e-8
 
