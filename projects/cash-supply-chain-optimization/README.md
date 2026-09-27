@@ -2,12 +2,13 @@
 
 An integrated Operations Research project for daily cash operations across a synthetic ATM and branch network.
 
-The project now contains two architectures:
+The project now contains three architectures:
 
 1. a **staged baseline** that solves replenishment/fleet decisions first and routing second;
-2. a **joint Inventory Routing Problem (IRP)** that chooses replenishment quantities and CIT routes in the same MILP.
+2. a **deterministic joint Inventory Routing Problem (IRP)** that chooses replenishment quantities and CIT routes in the same MILP;
+3. a **stochastic rolling-horizon IRP** that repeatedly re-optimizes short-horizon route and replenishment decisions under demand scenarios.
 
-The joint IRP is the primary model.
+The stochastic rolling-horizon layer is the most advanced model in the project.
 
 ## Decision layers
 
@@ -119,6 +120,82 @@ cost_improvement_vs_staged
 
 Because the staged plan is route-feasible for the synthetic instance, it provides a valid benchmark for the joint formulation.
 
+## Stochastic rolling-horizon IRP
+
+Module:
+
+```text
+cash_supply_chain.stochastic_rolling_horizon
+```
+
+The rolling-horizon controller operates as a receding-horizon policy:
+
+```text
+observe current cash state
+        ↓
+generate short-horizon demand scenarios
+        ↓
+solve stochastic route-column MILP
+        ↓
+execute only today's routes and deliveries
+        ↓
+observe realized withdrawals
+        ↓
+update inventory and cash-out
+        ↓
+shift horizon and re-optimize
+```
+
+Each stochastic subproblem is a **two-stage stochastic IRP**.
+
+Today's route selections and delivery quantities are here-and-now decisions and are shared across every demand scenario. This is the non-anticipativity condition for the first stage.
+
+Future days use scenario-specific recourse variables for:
+
+- route selection;
+- route-specific delivery quantities;
+- inventory;
+- safety-stock shortfall;
+- lost demand / cash-out.
+
+Cash-out is modeled explicitly rather than making high-demand scenarios infeasible. Lost demand receives a high penalty in the expected-cost objective.
+
+The rolling controller then executes only the shared first-day decision. Future scenario-specific decisions are discarded, new information is observed, and the optimization is solved again from the updated state.
+
+### Demand scenarios
+
+Synthetic scenarios use multiplicative lognormal forecast error around the deterministic withdrawal forecast.
+
+The implementation supports configurable:
+
+- planning horizon;
+- number of scenarios;
+- demand volatility;
+- scenario seed.
+
+### Deterministic rolling benchmark
+
+The same receding-horizon framework can also run with the deterministic joint IRP.
+
+Both policies can therefore be evaluated on the **same realized out-of-sample demand path**:
+
+```text
+deterministic rolling IRP
+vs.
+stochastic rolling IRP
+```
+
+The comparison reports:
+
+- total realized operating cost;
+- realized cash-out;
+- average end inventory;
+- number of operated routes;
+- cost difference versus deterministic rolling;
+- cash-out difference versus deterministic rolling.
+
+This is intentionally an out-of-sample policy comparison rather than a claim that the stochastic policy must dominate on every single realized path.
+
 ## Forecast-error simulation
 
 Both staged and joint plans are evaluated under the same Monte Carlo demand perturbations.
@@ -157,6 +234,7 @@ cash-supply-chain-optimization/
         ├── model.py
         ├── routing.py
         ├── joint_irp.py
+        ├── stochastic_rolling_horizon.py
         └── simulation.py
 ```
 
@@ -167,6 +245,9 @@ From the repository root:
 ```bash
 pip install -e ".[dev]"
 python projects/cash-supply-chain-optimization/run.py
+
+# stochastic receding-horizon experiment
+python projects/cash-supply-chain-optimization/run_rolling_horizon.py
 ```
 
 The runner solves both architectures and writes:
@@ -186,7 +267,14 @@ outputs/
 ├── joint_monte_carlo_simulation.csv
 ├── staged_simulation_summary.csv
 ├── joint_simulation_summary.csv
-└── fleet_sensitivity.csv
+├── fleet_sensitivity.csv
+├── rolling_policy_comparison.csv
+├── deterministic_rolling_deliveries.csv
+├── deterministic_rolling_routes.csv
+├── deterministic_rolling_daily_summary.csv
+├── stochastic_rolling_deliveries.csv
+├── stochastic_rolling_routes.csv
+└── stochastic_rolling_daily_summary.csv
 ```
 
 Generated outputs are git-ignored.
@@ -197,7 +285,8 @@ Generated outputs are git-ignored.
 pytest \
   tests/test_cash_supply_chain.py \
   tests/test_cash_supply_chain_routing.py \
-  tests/test_cash_supply_chain_joint_irp.py
+  tests/test_cash_supply_chain_joint_irp.py \
+  tests/test_cash_supply_chain_stochastic_rolling.py
 ```
 
 The tests validate:
@@ -211,6 +300,11 @@ The tests validate:
 - route catalog stop limits;
 - objective/cost-breakdown consistency;
 - joint-vs-staged benchmark consistency;
+- stochastic scenario reproducibility;
+- first-stage stochastic-route feasibility;
+- scenario terminal-state feasibility;
+- rolling inventory-state transitions;
+- deterministic/stochastic comparison on the same realized path;
 - Monte Carlo reproducibility.
 
 ## Scaling path
@@ -223,7 +317,7 @@ Larger networks would require methods such as:
 - branch-and-price;
 - route-generation heuristics;
 - decomposition by cash center/geography;
-- rolling-horizon optimization;
+- multistage scenario-tree non-anticipativity beyond the current two-stage look-ahead;
 - neighborhood search;
 - adaptive large neighborhood search;
 - commercial VRP engines;
@@ -243,9 +337,12 @@ Natural extensions include:
 - insurance/vehicle value limits;
 - travel-time uncertainty;
 - emergency visits;
-- stochastic demand scenarios;
-- rolling-horizon re-optimization;
-- scenario-dependent route recourse.
+- correlated cashpoint demand scenarios;
+- regime-dependent forecast errors;
+- scenario reduction;
+- CVaR / downside-risk objectives;
+- multistage scenario-tree recourse;
+- distributionally robust demand sets.
 
 ## Limitations
 
