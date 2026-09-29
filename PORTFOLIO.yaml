@@ -1,0 +1,25 @@
+schema_version: 1
+repository: banking-and-financial-services-optimization
+role: umbrella
+axis: application
+area: banking-financial-services
+status: active
+owner: jorsacademy
+projects:
+  - asset-liability-management
+  - irrbb-curve-hedging
+  - credit-capital-allocation
+  - loan-pricing-and-limit-optimization
+  - liquidity-and-funding-optimization
+  - collections-optimization
+  - collateral-allocation
+  - fraud-alert-triage
+  - intraday-liquidity
+  - atm-cash-replenishment
+  - cash-supply-chain-optimization
+  - payment-routing
+  - deposit-pricing-and-retention
+conventions:
+  provenance_records: true
+  reproducibility_expected: true
+  benchmark_assumptions_documented: true
